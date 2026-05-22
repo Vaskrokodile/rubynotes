@@ -3,7 +3,7 @@ const STORAGE_KEY = 'rubynotes';
 let notes = [];
 let activeId = null;
 let currentView = 'editor';
-let currentMode = 'edit';
+let currentMode = 'preview';
 
 const notesList = document.getElementById('notes-list');
 const editorEmpty = document.getElementById('editor-empty');
@@ -47,18 +47,35 @@ function renderNotesList() {
   notes.forEach(note => {
     const el = document.createElement('div');
     el.className = 'note-item' + (note.id === activeId && currentView === 'editor' ? ' active' : '');
-    el.innerHTML = `
-      <div class="note-item-title">${escapeHtml(noteFileName(note))}</div>
-      <div class="note-item-preview">${escapeHtml(note.body.slice(0, 60) || 'No content')}</div>
-      <div class="note-item-date">${formatDate(note.updatedAt)}</div>
-    `;
+
+    const titleRow = document.createElement('div');
+    titleRow.className = 'note-item-title-row';
+
+    const titleEl = document.createElement('span');
+    titleEl.className = 'note-item-title';
+    titleEl.textContent = note.title || 'untitled';
+
+    const extEl = document.createElement('span');
+    extEl.className = 'note-item-ext';
+    extEl.textContent = '.mrld';
+
+    titleRow.appendChild(titleEl);
+    titleRow.appendChild(extEl);
+
+    const previewEl = document.createElement('div');
+    previewEl.className = 'note-item-preview';
+    previewEl.textContent = note.body.slice(0, 60) || 'No content';
+
+    const dateEl = document.createElement('div');
+    dateEl.className = 'note-item-date';
+    dateEl.textContent = formatDate(note.updatedAt);
+
+    el.appendChild(titleRow);
+    el.appendChild(previewEl);
+    el.appendChild(dateEl);
     el.addEventListener('click', () => selectNote(note.id));
     notesList.appendChild(el);
   });
-}
-
-function noteFileName(note) {
-  return escapeHtml((note.title || 'untitled')) + '<span class="ext-mrld">.mrld</span>';
 }
 
 function selectNote(id) {
@@ -72,6 +89,7 @@ function selectNote(id) {
     updatePreview();
   }
   showEditorView();
+  setMode('preview');
   renderNotesList();
   updateDocsBtn();
 }
@@ -98,9 +116,9 @@ function createNote() {
   updateFilename();
   updatePreview();
   showEditorView();
+  setMode('preview');
   renderNotesList();
   updateDocsBtn();
-  noteTitle.focus();
 }
 
 function deleteNote() {
@@ -111,7 +129,6 @@ function deleteNote() {
   noteTitle.value = '';
   noteBody.value = '';
   noteFilename.textContent = '';
-  currentMode = 'edit';
   setMode('edit');
   editorEmpty.classList.remove('hidden');
   editorContent.classList.add('hidden');
@@ -151,6 +168,7 @@ function setMode(mode) {
     tabPreview.classList.remove('active');
     paneEdit.classList.remove('hidden');
     panePreview.classList.add('hidden');
+    noteBody.focus();
   } else {
     tabPreview.classList.add('active');
     tabEdit.classList.remove('active');
@@ -161,8 +179,13 @@ function setMode(mode) {
 }
 
 function updatePreview() {
+  if (!activeId) return;
   previewTitle.textContent = noteTitle.value || 'Untitled';
-  previewBody.innerHTML = parseEmerald(noteBody.value);
+  try {
+    previewBody.innerHTML = parseEmerald(noteBody.value);
+  } catch (e) {
+    previewBody.innerHTML = '<p style="color:#e44">Preview error</p>';
+  }
 }
 
 function autoSave() {
@@ -211,7 +234,7 @@ function importFileContent(filename, content) {
   updateFilename();
   updatePreview();
   showEditorView();
-  setMode('edit');
+  setMode('preview');
   renderNotesList();
   updateDocsBtn();
   saveStatus.textContent = 'Imported ' + filename;

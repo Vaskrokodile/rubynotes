@@ -24,16 +24,16 @@
       </div>
       <div id="editor-content" class="editor-content hidden">
         <div class="editor-tabs">
-          <button id="tab-edit" class="tab active">Edit</button>
-          <button id="tab-preview" class="tab">Preview</button>
+          <button id="tab-edit" class="tab">Edit</button>
+          <button id="tab-preview" class="tab active">Preview</button>
           <span id="note-filename" class="note-filename"></span>
         </div>
         <div class="editor-panes">
-          <div id="pane-edit" class="pane">
+          <div id="pane-edit" class="pane hidden">
             <input id="note-title" class="note-title" placeholder="Title" />
             <textarea id="note-body" class="note-body" placeholder="Start writing in Emerald syntax..."></textarea>
           </div>
-          <div id="pane-preview" class="pane hidden">
+          <div id="pane-preview" class="pane">
             <div id="preview-title" class="preview-title"></div>
             <div id="preview-body" class="preview-body emerald-render"></div>
           </div>

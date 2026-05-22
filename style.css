@@ -81,6 +81,12 @@ body {
   background: #222;
 }
 
+.note-item-title-row {
+  display: flex;
+  align-items: baseline;
+  gap: 2px;
+}
+
 .note-item-title {
   font-size: 14px;
   font-weight: 500;
@@ -88,12 +94,15 @@ body {
   overflow: hidden;
   text-overflow: ellipsis;
   color: #fff;
+  min-width: 0;
+  flex: 1;
 }
 
-.ext-mrld {
+.note-item-ext {
   color: #4f8;
   font-weight: 400;
   font-size: 13px;
+  flex-shrink: 0;
 }
 
 .note-item-preview {
