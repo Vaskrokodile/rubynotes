@@ -90,6 +90,12 @@ body {
   color: #fff;
 }
 
+.ext-mrld {
+  color: #4f8;
+  font-weight: 400;
+  font-size: 13px;
+}
+
 .note-item-preview {
   font-size: 12px;
   color: #888;
@@ -194,6 +200,18 @@ body {
   border-bottom-color: #4f8;
 }
 
+.note-filename {
+  margin-left: auto;
+  font-size: 12px;
+  color: #4f8;
+  font-family: "SF Mono", "Fira Code", monospace;
+  padding: 10px 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 40%;
+}
+
 /* ---- editor panes ---- */
 
 .editor-panes {
@@ -248,6 +266,14 @@ body {
   color: #444;
 }
 
+.note-body.drag-over {
+  background: rgba(68, 255, 136, 0.04);
+  border: 2px dashed #4f8;
+  border-radius: 8px;
+  margin: -2px;
+  padding: 2px 0;
+}
+
 /* ---- preview pane ---- */
 
 .preview-title {
@@ -272,6 +298,36 @@ body {
   padding: 12px 28px;
   border-top: 1px solid #1a1a1a;
   flex-shrink: 0;
+  gap: 12px;
+}
+
+.footer-left {
+  display: flex;
+  gap: 8px;
+}
+
+.footer-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.btn-io {
+  background: transparent;
+  color: #4f8;
+  border: 1px solid #3a3a3a;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: "SF Mono", "Fira Code", monospace;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.btn-io:hover {
+  background: #111;
+  border-color: #4f8;
 }
 
 .save-status {
