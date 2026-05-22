@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RubyNotes</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <h1>RubyNotes</h1>
+        <button id="new-note-btn" class="btn-new">+ New Note</button>
+      </div>
+      <div id="notes-list" class="notes-list"></div>
+    </aside>
+    <main class="editor">
+      <div id="editor-empty" class="editor-empty">
+        <p>Select a note or create a new one</p>
+      </div>
+      <div id="editor-content" class="editor-content hidden">
+        <input id="note-title" class="note-title" placeholder="Title" />
+        <textarea id="note-body" class="note-body" placeholder="Start writing..."></textarea>
+        <div class="editor-footer">
+          <span id="save-status" class="save-status"></span>
+          <button id="delete-note-btn" class="btn-delete">Delete</button>
+        </div>
+      </div>
+    </main>
+  </div>
+  <script src="app.js"></script>
+</body>
+</html>
