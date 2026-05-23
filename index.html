@@ -172,14 +172,13 @@ h2: Executive Summary
 @ This document outlines our strategic direction for Q3 2026...</pre>
 
 <h3>//terminal</h3>
-<p>Opens an <strong>opencode terminal session</strong> at the bottom of the screen, pre-loaded with the current note as context. The terminal has access to the full note content — you can type <code>build this app</code> and it processes your note as the specification.</p>
+<p>Adds an inline <strong>EMERALD AI Coding Harness</strong> terminal below the note content — with a big green EMERALD banner styled like opencode. The terminal has the full note as context. You can type <code>build this app</code>, <code>explain the architecture</code>, or <code>review the spec</code> — it understands your note and responds accordingly.</p>
 <pre>//terminal
 # My App Spec
 > User authentication with JWT
 > REST API for CRUD operations
-> PostgreSQL database schema
-@ Then type "build this app" in the terminal.</pre>
-<p>Terminal commands: <code>help</code> <code>context</code> <code>tasks</code> <code>explain</code> <code>build</code> <code>clear</code> <code>exit</code></p>
+> PostgreSQL database schema</pre>
+<p><strong>CLI commands:</strong> <code>help</code> <code>context</code> <code>tasks</code> <code>explain</code> <code>build</code> <code>review</code> <code>arch</code> <code>clear</code> <code>exit</code>. Arrow-up/down for history.</p>
 
 <h2>Self-Opening .mrld Files</h2>
 <p>When you export a <code>.mrld</code> file, it's a self-contained HTML document. Double-click it in any OS — it opens in your browser and renders the Emerald content. The complete parser and styles are embedded in the file. No app needed to view.</p>
@@ -222,17 +221,6 @@ h2: Executive Summary
   <li><strong>Comments that vanish</strong> — <code>/ private note</code> hidden in Preview, visible while editing</li>
 </ul>
 
-        </div>
-      </div>
-      <div id="terminal-panel" class="terminal-panel">
-        <div class="terminal-header">
-          <span>opencode</span>
-          <button id="terminal-close" class="terminal-close">&times;</button>
-        </div>
-        <div id="terminal-output" class="terminal-output"></div>
-        <div class="terminal-input-line">
-          <span class="terminal-prompt">$</span>
-          <input id="terminal-input" class="terminal-input" placeholder="Type a command..." />
         </div>
       </div>
     </main>

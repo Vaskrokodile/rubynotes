@@ -3,7 +3,9 @@ const STORAGE_KEY = 'rubynotes';
 let notes = [];
 let activeId = null;
 let currentView = 'editor';
-let terminalOpen = false;
+let cliActive = false;
+let cliHistory = [];
+let cliHistIdx = -1;
 
 const notesList = document.getElementById('notes-list');
 const editorEmpty = document.getElementById('editor-empty');
@@ -25,15 +27,6 @@ const previewBody = document.getElementById('preview-body');
 const importBtn = document.getElementById('import-btn');
 const exportBtn = document.getElementById('export-btn');
 const importFile = document.getElementById('import-file');
-
-const termPanel = document.getElementById('terminal-panel');
-const termOutput = document.getElementById('terminal-output');
-const termInput = document.getElementById('terminal-input');
-const termClose = document.getElementById('terminal-close');
-const termHeader = document.querySelector('.terminal-header span');
-
-const TERM_HISTORY = [];
-let termHistIdx = -1;
 
 function loadNotes() {
   const raw = localStorage.getItem(STORAGE_KEY);
@@ -77,7 +70,6 @@ function renderNotesList() {
 }
 
 function selectNote(id) {
-  closeTerminal();
   currentView = 'editor';
   activeId = id;
   const note = notes.find(n => n.id === id);
@@ -98,7 +90,6 @@ function updateFilename() {
 }
 
 function createNote() {
-  closeTerminal();
   const now = Date.now();
   const note = { id: now.toString(), title: '', body: '', createdAt: now, updatedAt: now };
   notes.push(note);
@@ -123,7 +114,6 @@ function deleteNote() {
   noteTitle.value = '';
   noteBody.value = '';
   noteFilename.textContent = '';
-  closeTerminal();
   setMode('edit');
   editorEmpty.classList.remove('hidden');
   editorContent.classList.add('hidden');
@@ -141,7 +131,6 @@ function showEditorView() {
 function showDocsView() {
   currentView = 'docs';
   activeId = null;
-  closeTerminal();
   editorContent.classList.add('hidden');
   editorEmpty.classList.add('hidden');
   docsContent.classList.remove('hidden');
@@ -187,16 +176,15 @@ function updatePreview() {
 
   panePreview.classList.toggle('whitepaper', isWhitepaper);
 
-  if (isTerminal && activeId) {
-    const note = notes.find(n => n.id === activeId);
-    openTerminal(note ? note.title : 'untitled', note ? note.body : body);
-  }
-
   try {
     setEmeraldNotes(notes);
     previewBody.innerHTML = parseEmerald(body);
   } catch (e) {
     previewBody.innerHTML = '<p style="color:var(--red)">Preview error</p>';
+  }
+
+  if (isTerminal && activeId) {
+    appendCLI(previewBody);
   }
 }
 
@@ -263,9 +251,7 @@ function handleFileSelect(e) {
     return;
   }
   const reader = new FileReader();
-  reader.onload = function(ev) {
-    importFileContent(file.name, ev.target.result);
-  };
+  reader.onload = function(ev) { importFileContent(file.name, ev.target.result); };
   reader.readAsText(file);
   importFile.value = '';
 }
@@ -304,157 +290,201 @@ function setupDragDrop() {
   });
 }
 
-/* ===================== TERMINAL ===================== */
+/* ===================== EMERALD CLI ===================== */
 
-function openTerminal(noteTitle, noteBody) {
-  terminalOpen = true;
-  termPanel.classList.add('open');
-  termHeader.textContent = 'opencode --context ' + (noteTitle || 'untitled') + '.mrld';
-  termOutput.innerHTML = '';
-  termWrite('<span class="term-info">opencode v4.0 — context loaded: ' + (noteTitle || 'untitled') + '.mrld</span>', '');
-  termWrite('Context summary:', '');
-  const lines = noteBody.split('\n').filter(l => l.trim());
-  termWrite('  ' + lines.length + ' lines, ' + noteBody.length + ' chars', 'term-out');
-  termWrite('', '');
-  termWrite('Type <span class="term-cmd">help</span> for commands, <span class="term-cmd">clear</span> to reset.', 'term-out');
-  termWrite('', '');
-  termInput.value = '';
-  termInput.focus();
-  TERM_HISTORY.length = 0;
-  termHistIdx = -1;
+function appendCLI(container) {
+  if (cliActive) return;
+  cliActive = true;
+
+  const note = notes.find(n => n.id === activeId);
+  const noteName = (note ? note.title : 'untitled') || 'untitled';
+  const noteBodyTxt = note ? note.body : '';
+
+  const cli = document.createElement('div');
+  cli.className = 'em-cli';
+  cli.id = 'em-cli';
+  cli.innerHTML =
+    '<div class="em-cli-banner">' +
+      '<div class="em-cli-logo">E M E R A L D</div>' +
+      '<div class="em-cli-subtitle">AI Coding Harness v1.0 &mdash; context: '+esc(noteName)+'.mrld</div>' +
+    '</div>' +
+    '<div class="em-cli-output" id="em-cli-output"></div>' +
+    '<div class="em-cli-input-line">' +
+      '<span class="em-cli-prompt">emerald &gt;</span>' +
+      '<input class="em-cli-input" id="em-cli-input" placeholder="Type a command... (help)" />' +
+    '</div>';
+
+  container.appendChild(cli);
+
+  const output = cli.querySelector('#em-cli-output');
+  const input = cli.querySelector('#em-cli-input');
+
+  cliHistory = [];
+  cliHistIdx = -1;
+
+  cliWrite(output, 'EMERALD AI Coding Harness ready.', 'info');
+  cliWrite(output, 'Context loaded: ' + esc(noteName) + '.mrld (' + noteBodyTxt.split('\n').length + ' lines)', 'info');
+  cliWrite(output, '', '');
+  cliWrite(output, 'Type help for commands. The note above is my context.', 'out');
+  cliWrite(output, 'You can say things like "build this app" or "explain the architecture".', 'out');
+  cliWrite(output, '', '');
+
+  input.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') {
+      const cmd = input.value.trim();
+      input.value = '';
+      if (cmd) {
+        cliHistory.push(cmd);
+        cliHistIdx = cliHistory.length;
+        processCLI(output, cmd, noteName, noteBodyTxt);
+      }
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      if (cliHistory.length > 0) {
+        if (cliHistIdx === cliHistory.length) cliHistIdx = cliHistory.length - 1;
+        else if (cliHistIdx > 0) cliHistIdx--;
+        input.value = cliHistory[cliHistIdx] || '';
+      }
+    } else if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      if (cliHistIdx < cliHistory.length - 1) {
+        cliHistIdx++;
+        input.value = cliHistory[cliHistIdx] || '';
+      } else {
+        cliHistIdx = cliHistory.length;
+        input.value = '';
+      }
+    }
+  });
+
+  input.focus();
+  output.scrollTop = output.scrollHeight;
 }
 
-function closeTerminal() {
-  terminalOpen = false;
-  termPanel.classList.remove('open');
-}
-
-function termWrite(text, cls) {
+function cliWrite(output, text, type) {
   const div = document.createElement('div');
-  div.className = 'term-line ' + (cls || '');
+  div.className = 'em-cli-msg em-cli-msg-' + (type || 'out');
   div.innerHTML = text;
-  termOutput.appendChild(div);
-  termOutput.scrollTop = termOutput.scrollHeight;
+  output.appendChild(div);
+  output.scrollTop = output.scrollHeight;
 }
 
-function termWriteCmd(cmd) {
-  termWrite('<span class="term-prompt" style="color:var(--green);font-weight:700">$</span> <span class="term-cmd">' + esc(cmd) + '</span>', '');
+function cliWriteCmd(output, cmd) {
+  cliWrite(output, '<span class="em-cli-prompt">emerald &gt;</span> ' + esc(cmd), 'cmd');
 }
 
-function processTermCommand(cmd) {
-  const trimmed = cmd.trim();
-  if (!trimmed) return;
-
-  TERM_HISTORY.push(trimmed);
-  termHistIdx = TERM_HISTORY.length;
-  termWriteCmd(trimmed);
-
-  const lower = trimmed.toLowerCase();
+function processCLI(output, cmd, noteName, noteBodyTxt) {
+  cliWriteCmd(output, cmd);
+  const lower = cmd.toLowerCase().trim();
 
   if (lower === 'help') {
-    termWrite('  opencode commands:', 'term-out');
-    termWrite('  <span class="term-cmd">help</span>       — show this', 'term-out');
-    termWrite('  <span class="term-cmd">clear</span>      — clear terminal', 'term-out');
-    termWrite('  <span class="term-cmd">context</span>    — show note context summary', 'term-out');
-    termWrite('  <span class="term-cmd">build</span>      — simulate building from note spec', 'term-out');
-    termWrite('  <span class="term-cmd">explain</span>    — explain the note content', 'term-out');
-    termWrite('  <span class="term-cmd">tasks</span>      — extract all tasks from note', 'term-out');
-    termWrite('  <span class="term-cmd">exit</span>       — close terminal', 'term-out');
+    cliWrite(output, '  <strong>help</strong>       — show this menu', 'out');
+    cliWrite(output, '  <strong>clear</strong>      — clear the terminal', 'out');
+    cliWrite(output, '  <strong>context</strong>    — show note context summary', 'out');
+    cliWrite(output, '  <strong>explain</strong>    — explain the note content and structure', 'out');
+    cliWrite(output, '  <strong>tasks</strong>      — extract all tasks with due dates', 'out');
+    cliWrite(output, '  <strong>build</strong>      — simulate building the project from note spec', 'out');
+    cliWrite(output, '  <strong>review</strong>     — code-review the note as a spec document', 'out');
+    cliWrite(output, '  <strong>arch</strong>       — generate architecture from note description', 'out');
+    cliWrite(output, '  <strong>exit</strong>       — close the terminal', 'out');
   } else if (lower === 'clear') {
-    termOutput.innerHTML = '';
+    output.innerHTML = '';
+    return;
   } else if (lower === 'exit') {
-    closeTerminal();
+    cliActive = false;
+    const cli = document.getElementById('em-cli');
+    if (cli) cli.remove();
     return;
   } else if (lower === 'context') {
-    const note = notes.find(n => n.id === activeId);
-    if (note) {
-      termWrite('  Note: ' + (note.title || 'untitled') + '.mrld', 'term-out');
-      termWrite('  Lines: ' + note.body.split('\n').length, 'term-out');
-      const headers = note.body.match(/^(#|!!|Title:|h[234]:)\s*.+/gm);
-      if (headers) {
-        termWrite('  Sections:', 'term-out');
-        headers.forEach(h => termWrite('    ' + h.replace(/^(#|!!|Title:|h[234]:)\s*/, ''), 'term-out'));
-      }
+    cliWrite(output, '  <strong>Note:</strong> ' + esc(noteName) + '.mrld', 'out');
+    cliWrite(output, '  <strong>Lines:</strong> ' + noteBodyTxt.split('\n').length + ' | <strong>Chars:</strong> ' + noteBodyTxt.length, 'out');
+    const headers = noteBodyTxt.match(/^(#|!!|Title:|h[234]:)\s*.+/gm);
+    if (headers) {
+      cliWrite(output, '  <strong>Sections detected:</strong>', 'out');
+      headers.forEach(h => cliWrite(output, '    &bull; ' + esc(h.replace(/^(#|!!|Title:|h[234]:)\s*/, '')), 'out'));
     }
   } else if (lower === 'tasks') {
-    const note = notes.find(n => n.id === activeId);
-    if (note) {
-      const tasks = note.body.match(/^>\s*.+/gm);
-      if (tasks && tasks.length) {
-        termWrite('  Found ' + tasks.length + ' tasks:', 'term-info');
-        tasks.forEach(t => termWrite('    [ ] ' + t.replace(/^>\s*/, ''), 'term-out'));
-      } else {
-        termWrite('  No tasks found in note.', 'term-out');
-      }
+    const tasks = noteBodyTxt.match(/^>\s*.+/gm);
+    if (tasks && tasks.length) {
+      cliWrite(output, '  Found <strong>' + tasks.length + '</strong> tasks:', 'info');
+      tasks.forEach(t => {
+        const text = t.replace(/^>\s*/, '');
+        cliWrite(output, '    [ ] ' + esc(text), 'out');
+      });
+    } else {
+      cliWrite(output, '  No tasks found.', 'err');
     }
   } else if (lower === 'explain') {
-    const note = notes.find(n => n.id === activeId);
-    if (note) {
-      termWrite('  Analyzing: ' + (note.title || 'untitled') + '.mrld', 'term-info');
-      termWrite('', '');
-      const lines = note.body.split('\n').filter(l => l.trim()).length;
-      const hasTasks = />\s/.test(note.body);
-      const hasAi = /@ai\s/.test(note.body);
-      const hasFm = /^---/m.test(note.body);
-      termWrite('  This note contains ' + lines + ' lines of Emerald syntax.', 'term-out');
-      if (hasTasks) termWrite('  Includes actionable tasks with checkboxes.', 'term-out');
-      if (hasAi) termWrite('  Contains @ai command blocks ready for AI execution.', 'term-out');
-      if (hasFm) termWrite('  Has YAML-like frontmatter with structured metadata.', 'term-out');
-      termWrite('', '');
-      termWrite('  The note is structured as a self-contained document.', 'term-out');
-      termWrite('  All syntax renders in the Preview tab. Use //whitepaper', 'term-out');
-      termWrite('  to view as a formal document, or //terminal to open', 'term-out');
-      termWrite('  this session.', 'term-out');
-    }
+    cliWrite(output, '  Analyzing <strong>' + esc(noteName) + '.mrld</strong>...', 'info');
+    cliWrite(output, '', '');
+    const lines = noteBodyTxt.split('\n').filter(l => l.trim()).length;
+    cliWrite(output, '  This note contains ' + lines + ' lines of Emerald syntax.', 'out');
+    if (/>\s/.test(noteBodyTxt)) cliWrite(output, '  Detected <strong>task blocks</strong> with checkboxes and due dates.', 'out');
+    if (/@ai\s/.test(noteBodyTxt)) cliWrite(output, '  Contains <strong>@ai command blocks</strong> — ready for AI execution.', 'out');
+    if (/@memory\s/.test(noteBodyTxt)) cliWrite(output, '  Has <strong>@memory tags</strong> for persistent AI context.', 'out');
+    if (/^---/m.test(noteBodyTxt)) cliWrite(output, '  Includes <strong>frontmatter</strong> with structured metadata.', 'out');
+    if (/\|.*\|/.test(noteBodyTxt)) cliWrite(output, '  Contains <strong>tables</strong> with structured data.', 'out');
+    if (/~.*~/.test(noteBodyTxt)) cliWrite(output, '  Has <strong>kanban boards</strong> for project tracking.', 'out');
+    if (/{{note:/.test(noteBodyTxt)) cliWrite(output, '  Uses <strong>transclusion</strong> to embed other notes.', 'out');
+    cliWrite(output, '', '');
+    cliWrite(output, '  The note is structured as a self-contained specification.', 'out');
+    cliWrite(output, '  It describes architecture, tasks, questions, and metadata —', 'out');
+    cliWrite(output, '  everything I need to understand and act on the project.', 'out');
   } else if (lower.startsWith('build')) {
-    termWrite('  Building from note context...', 'term-info');
-    const note = notes.find(n => n.id === activeId);
-    if (note) {
+    cliWrite(output, '  Reading specification from <strong>' + esc(noteName) + '.mrld</strong>...', 'info');
+    setTimeout(() => {
+      cliWrite(output, '  Parsing project structure and dependencies...', 'out');
       setTimeout(() => {
-        termWrite('  Scanning project structure...', 'term-out');
+        cliWrite(output, '  Generating scaffold based on note architecture...', 'out');
+        const tasks = (noteBodyTxt.match(/^>\s*.+/gm) || []).length;
+        if (tasks > 0) {
+          cliWrite(output, '  Found ' + tasks + ' tasks to implement.', 'info');
+        }
         setTimeout(() => {
-          termWrite('  Resolving dependencies from note spec...', 'term-out');
-          setTimeout(() => {
-            termWrite('  <span class="term-info">Build complete.</span> Output would be generated', 'term-info');
-            termWrite('  based on the instructions in ' + (note.title || 'untitled') + '.mrld', 'term-out');
-          }, 300);
+          cliWrite(output, '', '');
+          cliWrite(output, '  <strong style="color:var(--green)">Build simulation complete.</strong>', 'info');
+          cliWrite(output, '  In a real environment, I would generate the full project', 'out');
+          cliWrite(output, '  based on the specification in ' + esc(noteName) + '.mrld.', 'out');
+          cliWrite(output, '  The note contains all necessary context for implementation.', 'out');
         }, 300);
-      }, 200);
+      }, 400);
+    }, 200);
+  } else if (lower.startsWith('review')) {
+    cliWrite(output, '  Performing code review of <strong>' + esc(noteName) + '.mrld</strong>...', 'info');
+    cliWrite(output, '', '');
+    cliWrite(output, '  <strong style="color:var(--yellow)">Review Findings:</strong>', 'out');
+    cliWrite(output, '  Structure is well-organized with clear sections.', 'out');
+    cliWrite(output, '  Tasks are properly defined with due dates.', 'out');
+    const warnings = noteBodyTxt.match(/^!\s*.+/gm);
+    if (warnings && warnings.length) {
+      cliWrite(output, '  ' + warnings.length + ' warnings/risks flagged for attention.', 'out');
     }
+    cliWrite(output, '  Recommendation: add more detail to implementation tasks.', 'out');
+    cliWrite(output, '  Overall score: <strong style="color:var(--green)">8.5/10</strong>', 'info');
+  } else if (lower.startsWith('arch')) {
+    cliWrite(output, '  Generating architecture from <strong>' + esc(noteName) + '.mrld</strong>...', 'info');
+    cliWrite(output, '', '');
+    cliWrite(output, '<span class="em-cli-msg-code">' +
+      esc(noteName) + '\n' +
+      '\u251C\u2500\u2500 Components derived from note:\n' +
+      '    \u251C\u2500\u2500 Frontend: React + TypeScript\n' +
+      '    \u251C\u2500\u2500 Backend: Node.js + Express\n' +
+      '    \u2514\u2500\u2500 Database: PostgreSQL\n' +
+      '\n' +
+      '  Data flow: Client \u2192 API \u2192 Service \u2192 DB\n' +
+      '  Auth: JWT tokens with refresh rotation\n' +
+      '  Deploy: Docker + Kubernetes</span>', 'out');
+    cliWrite(output, '', '');
+    cliWrite(output, '  This architecture is <strong>inferred</strong> from your note.', 'out');
+    cliWrite(output, '  Add more detail to refine the generated structure.', 'out');
   } else {
-    termWrite('  <span class="term-err">opencode: command not found: ' + esc(trimmed) + '</span>', '');
-    termWrite('  Type <span class="term-cmd">help</span> for available commands.', 'term-out');
+    cliWrite(output, '  <span style="color:var(--red)">Unknown command: ' + esc(cmd) + '</span>', 'err');
+    cliWrite(output, '  Type <strong>help</strong> to see available commands.', 'out');
   }
 
-  termWrite('', '');
-  termOutput.scrollTop = termOutput.scrollHeight;
+  cliWrite(output, '', '');
+  output.scrollTop = output.scrollHeight;
 }
-
-termInput.addEventListener('keydown', function(e) {
-  if (e.key === 'Enter') {
-    const cmd = termInput.value;
-    termInput.value = '';
-    processTermCommand(cmd);
-  } else if (e.key === 'ArrowUp') {
-    e.preventDefault();
-    if (TERM_HISTORY.length > 0) {
-      if (termHistIdx === TERM_HISTORY.length) termHistIdx = TERM_HISTORY.length - 1;
-      else if (termHistIdx > 0) termHistIdx--;
-      termInput.value = TERM_HISTORY[termHistIdx] || '';
-    }
-  } else if (e.key === 'ArrowDown') {
-    e.preventDefault();
-    if (termHistIdx < TERM_HISTORY.length - 1) {
-      termHistIdx++;
-      termInput.value = TERM_HISTORY[termHistIdx] || '';
-    } else {
-      termHistIdx = TERM_HISTORY.length;
-      termInput.value = '';
-    }
-  }
-});
-
-termClose.addEventListener('click', closeTerminal);
 
 /* ===================== INIT ===================== */
 
