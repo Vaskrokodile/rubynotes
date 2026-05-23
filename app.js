@@ -77,6 +77,30 @@ function showDocsView() {
   docsContent.classList.remove('hidden'); updateDocsBtn(); renderNotesList();
 }
 function updateDocsBtn() { docsBtn.classList.toggle('active', currentView === 'docs'); }
+function terminalNoteContext(body, cliType) {
+  var note = notes.find(function(n) { return n.id === activeId; });
+  var cleanedBody = body
+    .replace(/^\/\/whitepaper\s*\n?/gm, '')
+    .replace(/^\/\/terminal(?:\s+\S+)?\s*\n?/gm, '')
+    .trim();
+
+  return {
+    id: activeId,
+    title: noteTitle.value || (note && note.title) || 'untitled',
+    body: cleanedBody,
+    rawBody: body,
+    cliType: cliType,
+    updatedAt: note ? note.updatedAt : Date.now(),
+    notes: notes.map(function(n) {
+      return {
+        id: n.id,
+        title: n.title || 'untitled',
+        body: n.body || '',
+        updatedAt: n.updatedAt
+      };
+    })
+  };
+}
 
 function updatePreview() {
   if (!activeId) return;
@@ -201,7 +225,10 @@ function terminalColors(type) {
 }
 
 function openTerminal(type) {
-  if (termActive && currentTerminalType === type && termInstance) return;
+  if (termActive && currentTerminalType === type && termInstance) {
+    updateTerminalContext(type);
+    return;
+  }
 
   destroyTerminal();
   termActive = true;
@@ -262,6 +289,13 @@ function openTerminal(type) {
   terminalDisposables.push(function() { try { resizeObserver.disconnect(); } catch(e) {} });
 }
 
+function updateTerminalContext(type) {
+  if (!termSessionId || !window.rubyNotesTerminal) return;
+  try {
+    window.rubyNotesTerminal.updateContext(termSessionId, terminalNoteContext(noteBody.value, type));
+  } catch(e) {}
+}
+
 function connectTerminal(type) {
   if (window.rubyNotesTerminal) {
     connectElectronTerminal(type);
@@ -297,7 +331,8 @@ function connectElectronTerminal(type) {
     id: id,
     type: type,
     cols: termInstance.cols || 100,
-    rows: termInstance.rows || 28
+    rows: termInstance.rows || 28,
+    noteContext: terminalNoteContext(noteBody.value, type)
   }).then(function() {
     resizeTerminalSession();
   }).catch(function(err) {

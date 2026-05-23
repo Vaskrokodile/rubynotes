@@ -1,4 +1,5 @@
 const path = require('path');
+const fs = require('fs');
 const { spawnSync } = require('child_process');
 const { app, BrowserWindow, ipcMain } = require('electron');
 const pty = require('@homebridge/node-pty-prebuilt-multiarch');
@@ -243,10 +244,138 @@ function buildCliScript(type) {
   return isWindows ? buildWindowsCliScript(type, def) : buildUnixCliScript(type, def);
 }
 
+function safeName(value) {
+  return String(value || 'untitled')
+    .replace(/[<>:"/\\|?*\x00-\x1F]/g, '-')
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '')
+    .slice(0, 60) || 'untitled';
+}
+
+function envText(value, limit = 8000) {
+  const text = String(value || '');
+  return text.length > limit ? `${text.slice(0, limit)}\n...[truncated, see RUBYNOTES_NOTE_FILE]` : text;
+}
+
+function formatDate(value) {
+  const date = value ? new Date(value) : new Date();
+  if (Number.isNaN(date.getTime())) return new Date().toISOString();
+  return date.toISOString();
+}
+
+function buildNoteMarkdown(noteContext = {}) {
+  const title = noteContext.title || 'untitled';
+  const body = noteContext.body || '';
+  return [
+    `# ${title}`,
+    '',
+    `Updated: ${formatDate(noteContext.updatedAt)}`,
+    '',
+    '## Active Note Body',
+    '',
+    body || '(empty note)'
+  ].join('\n');
+}
+
+function buildAllNotesMarkdown(noteContext = {}) {
+  const allNotes = Array.isArray(noteContext.notes) ? noteContext.notes : [];
+  if (!allNotes.length) return '# RubyNotes Notes\n\nNo other notes were provided.\n';
+
+  return allNotes.map((note) => [
+    `# ${note.title || 'untitled'}`,
+    '',
+    `Updated: ${formatDate(note.updatedAt)}`,
+    '',
+    note.body || '(empty note)'
+  ].join('\n')).join('\n\n---\n\n');
+}
+
+function buildAgentsMarkdown(noteContext = {}) {
+  const noteTitle = noteContext.title || 'untitled';
+  const noteBody = noteContext.body || '(empty note)';
+  return [
+    '# RubyNotes Context',
+    '',
+    'You are running inside a RubyNotes embedded terminal.',
+    'Use the active note as first-class context for every answer.',
+    'If the user asks what you see, summarize the active note content below, not only the terminal environment.',
+    '',
+    'The active note is also available at `RUBYNOTES_NOTE.md`.',
+    'All notes exported from RubyNotes are available at `RUBYNOTES_ALL_NOTES.md`.',
+    '',
+    '## Active Note',
+    '',
+    `Title: ${noteTitle}`,
+    '',
+    '```text',
+    noteBody,
+    '```'
+  ].join('\n');
+}
+
+function createTerminalWorkspace(noteContext, type) {
+  if (!noteContext || !noteContext.id) return { cwd: app.getPath('home'), env: {} };
+
+  const dirName = `${safeName(noteContext.title)}-${safeName(noteContext.id)}`;
+  const root = path.join(app.getPath('userData'), 'terminal-contexts', dirName);
+  fs.mkdirSync(root, { recursive: true });
+
+  const noteFile = path.join(root, 'RUBYNOTES_NOTE.md');
+  const allNotesFile = path.join(root, 'RUBYNOTES_ALL_NOTES.md');
+  const agentsFile = path.join(root, 'AGENTS.md');
+
+  fs.writeFileSync(noteFile, buildNoteMarkdown(noteContext), 'utf8');
+  fs.writeFileSync(allNotesFile, buildAllNotesMarkdown(noteContext), 'utf8');
+  fs.writeFileSync(agentsFile, buildAgentsMarkdown(noteContext), 'utf8');
+
+  return {
+    cwd: root,
+    noteContext,
+    env: {
+      RUBYNOTES_NOTE_ID: String(noteContext.id || ''),
+      RUBYNOTES_NOTE_TITLE: String(noteContext.title || ''),
+      RUBYNOTES_NOTE_BODY: envText(noteContext.body),
+      RUBYNOTES_NOTE_FILE: noteFile,
+      RUBYNOTES_ALL_NOTES_FILE: allNotesFile,
+      RUBYNOTES_AGENTS_FILE: agentsFile,
+      RUBYNOTES_TERMINAL_TYPE: type
+    }
+  };
+}
+
+function writeTerminalWorkspace(workspace, noteContext, type) {
+  if (!workspace || !workspace.cwd || !noteContext) return workspace;
+
+  fs.mkdirSync(workspace.cwd, { recursive: true });
+  const noteFile = path.join(workspace.cwd, 'RUBYNOTES_NOTE.md');
+  const allNotesFile = path.join(workspace.cwd, 'RUBYNOTES_ALL_NOTES.md');
+  const agentsFile = path.join(workspace.cwd, 'AGENTS.md');
+
+  fs.writeFileSync(noteFile, buildNoteMarkdown(noteContext), 'utf8');
+  fs.writeFileSync(allNotesFile, buildAllNotesMarkdown(noteContext), 'utf8');
+  fs.writeFileSync(agentsFile, buildAgentsMarkdown(noteContext), 'utf8');
+
+  workspace.noteContext = noteContext;
+  workspace.env = {
+    ...(workspace.env || {}),
+    RUBYNOTES_NOTE_ID: String(noteContext.id || ''),
+    RUBYNOTES_NOTE_TITLE: String(noteContext.title || ''),
+    RUBYNOTES_NOTE_BODY: envText(noteContext.body),
+    RUBYNOTES_NOTE_FILE: noteFile,
+    RUBYNOTES_ALL_NOTES_FILE: allNotesFile,
+    RUBYNOTES_AGENTS_FILE: agentsFile,
+    RUBYNOTES_TERMINAL_TYPE: type
+  };
+
+  return workspace;
+}
+
 ipcMain.handle('terminal:create', (event, options = {}) => {
   const id = options.id || `${Date.now()}-${Math.random().toString(16).slice(2)}`;
   const type = options.type || 'default';
-  const cwd = options.cwd && path.isAbsolute(options.cwd) ? options.cwd : app.getPath('home');
+  const workspace = createTerminalWorkspace(options.noteContext, type);
+  const cwd = options.cwd && path.isAbsolute(options.cwd) ? options.cwd : workspace.cwd;
   const def = CLI_DEFS[type] || CLI_DEFS.default;
   const resolved = def.install ? resolveExecutable(def.executables) : null;
   const script = resolved ? null : buildCliScript(type);
@@ -262,12 +391,13 @@ ipcMain.handle('terminal:create', (event, options = {}) => {
     cwd,
     env: {
       ...process.env,
+      ...workspace.env,
       TERM: 'xterm-256color',
       RUBYNOTES_TERMINAL: type
     }
   });
 
-  terminals.set(id, term);
+  terminals.set(id, { term, workspace, type });
 
   term.onData((data) => {
     if (!event.sender.isDestroyed()) {
@@ -286,19 +416,26 @@ ipcMain.handle('terminal:create', (event, options = {}) => {
 });
 
 ipcMain.on('terminal:write', (_event, payload) => {
-  const term = terminals.get(payload.id);
-  if (term) term.write(payload.data);
+  const session = terminals.get(payload.id);
+  if (session) session.term.write(payload.data);
 });
 
 ipcMain.on('terminal:resize', (_event, payload) => {
-  const term = terminals.get(payload.id);
-  if (term) term.resize(payload.cols, payload.rows);
+  const session = terminals.get(payload.id);
+  if (session) session.term.resize(payload.cols, payload.rows);
+});
+
+ipcMain.on('terminal:update-context', (_event, payload) => {
+  const session = terminals.get(payload.id);
+  if (session) {
+    session.workspace = writeTerminalWorkspace(session.workspace, payload.noteContext, session.type);
+  }
 });
 
 ipcMain.on('terminal:dispose', (_event, payload) => {
-  const term = terminals.get(payload.id);
-  if (term) {
-    term.kill();
+  const session = terminals.get(payload.id);
+  if (session) {
+    session.term.kill();
     terminals.delete(payload.id);
   }
 });
@@ -306,7 +443,7 @@ ipcMain.on('terminal:dispose', (_event, payload) => {
 app.whenReady().then(createWindow);
 
 app.on('window-all-closed', () => {
-  for (const term of terminals.values()) term.kill();
+  for (const session of terminals.values()) session.term.kill();
   terminals.clear();
   if (process.platform !== 'darwin') app.quit();
 });

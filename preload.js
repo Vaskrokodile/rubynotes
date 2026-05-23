@@ -10,6 +10,9 @@ contextBridge.exposeInMainWorld('rubyNotesTerminal', {
   resize(id, cols, rows) {
     ipcRenderer.send('terminal:resize', { id, cols, rows });
   },
+  updateContext(id, noteContext) {
+    ipcRenderer.send('terminal:update-context', { id, noteContext });
+  },
   dispose(id) {
     ipcRenderer.send('terminal:dispose', { id });
   },
