@@ -79,9 +79,10 @@ body {
   border-top:none; outline:none;
   color:var(--fg); line-height:1.75; flex:1;
   caret-color:var(--green); overflow-y:auto;
+  white-space:pre-wrap;
 }
 .live-preview:empty::before { content:attr(data-placeholder); color:#333; }
-.editor-content.terminal-mode .live-preview { display:none; }
+.editor-content.terminal-mode .live-preview:empty { display:none; }
 
 /* ---- CLI container (xterm terminals) ---- */
 #cli-container { flex-shrink:0; }

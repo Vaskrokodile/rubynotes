@@ -38,6 +38,7 @@ var aiWorkingText = document.getElementById('ai-working-text');
 var importBtn = document.getElementById('import-btn');
 var exportBtn = document.getElementById('export-btn');
 var importFile = document.getElementById('import-file');
+var composingRaw = false;
 
 function loadNotes() {
   var raw = localStorage.getItem(STORAGE_KEY);
@@ -165,10 +166,13 @@ function updatePreview() {
   editorContent.classList.toggle('terminal-mode', !!cliType);
 
   if (cliType) {
+    composingRaw = false;
+    livePreview.setAttribute('contenteditable', 'true');
     livePreview.innerHTML = '';
   } else {
     try {
       setEmeraldNotes(notes);
+      livePreview.setAttribute('contenteditable', 'true');
       livePreview.innerHTML = parseEmerald(body);
     } catch(e) { livePreview.innerHTML = '<p style="color:var(--red)">Preview error</p>'; }
   }
@@ -333,6 +337,22 @@ function openTerminal(type) {
   });
   resizeObserver.observe(termEl);
   terminalDisposables.push(function() { try { resizeObserver.disconnect(); } catch(e) {} });
+}
+function showRawEditor() {
+  if (composingRaw || currentView !== 'editor' || !activeId) return;
+  composingRaw = true;
+  editorContent.classList.remove('terminal-mode');
+  livePreview.setAttribute('contenteditable', 'true');
+  livePreview.innerText = noteBody.value;
+  placeCaretAtEnd(livePreview);
+}
+function placeCaretAtEnd(el) {
+  var range = document.createRange();
+  var sel = window.getSelection();
+  range.selectNodeContents(el);
+  range.collapse(false);
+  sel.removeAllRanges();
+  sel.addRange(range);
 }
 function serializeLivePreview() {
   var lines = [];
@@ -628,13 +648,16 @@ noteBody.addEventListener('input', function() {
 });
 livePreview.addEventListener('input', function() {
   if (!activeId || currentView !== 'editor') return;
-  noteBody.value = serializeLivePreview();
+  if (!composingRaw) composingRaw = true;
+  noteBody.value = livePreview.innerText.replace(/\u00a0/g, ' ');
   clearTimeout(saveTimer); saveStatus.textContent = 'Saving...';
-  saveTimer = setTimeout(function() { autoSave(); }, 650);
+  saveTimer = setTimeout(function() { autoSave(); updatePreview(); composingRaw = false; }, 1000);
 });
+livePreview.addEventListener('focus', showRawEditor);
 livePreview.addEventListener('blur', function() {
   if (!activeId || currentView !== 'editor') return;
-  noteBody.value = serializeLivePreview();
+  if (composingRaw) noteBody.value = livePreview.innerText.replace(/\u00a0/g, ' ');
+  composingRaw = false;
   autoSave();
   updatePreview();
 });
