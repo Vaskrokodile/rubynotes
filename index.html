@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>RubyNotes</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -79,8 +80,8 @@
     <tr><td><code>@ </code></td><td>Paragraph</td><td><code>@ Status update</code></td></tr>
     <tr><td><code>- / &bull;</code></td><td>Bullet list</td><td><code>- Item</code></td></tr>
     <tr><td><code>&gt; </code></td><td>Task + checkbox</td><td><code>&gt; Deploy @due(Fri)</code></td></tr>
-    <tr><td><code>? </code></td><td>Question / AI query</td><td><code>? What is the timeline?</code></td></tr>
-    <tr><td><code>! </code></td><td>Warning / alert</td><td><code>! SSL cert expires</code></td></tr>
+    <tr><td><code>? </code></td><td>Question</td><td><code>? What is the timeline?</code></td></tr>
+    <tr><td><code>! </code></td><td>Warning</td><td><code>! SSL cert expires</code></td></tr>
     <tr><td><code>/ </code></td><td>Comment (hidden)</td><td><code>/ TODO: verify</code></td></tr>
     <tr><td><code>+ </code></td><td>Toggle section</td><td><code>+ Details</code></td></tr>
     <tr><td><code>= </code></td><td>Key-value</td><td><code>= Status: Active</code></td></tr>
@@ -93,73 +94,50 @@
   </tbody>
 </table>
 
-<h2>AI Commands</h2>
-<pre>@ai summarize
-@ai extract action items with deadlines
-@ai find connections to other notes
-@ai generate 3 insights
-@memory fact The auth uses JWT</pre>
-
-<h2>Tables</h2>
-<pre>Table: Q3 Performance
-| Metric  | Target | Actual  | Status    |
-|---------|--------|---------|-----------|
-| Revenue | $240k  | $218k   | ! Behind  |
-| New     | 12k    | 15.2k   | &gt; Good    |</pre>
-
-<h2>Code Blocks</h2>
-<pre>Code: python
-def analyze_note(text):
-    return ai.summarize(text)</pre>
-
-<h2>Kanban</h2>
-<pre>Kanban: Tasks
-&gt; To Do
-  - Research
-&gt; In Progress
-  - Build parser
-&gt; Done
-  - Define spec</pre>
-
-<h2>Frontmatter</h2>
-<pre>---
-Project: Nexus
-Status: Active
-Due: 2026-06-15
-Tags: [format, productivity, ai]
----</pre>
+<h2>Terminal CLIs <span style="color:var(--green);font-size:11px">(real terminals via xterm.js)</span></h2>
+<table class="docs-table">
+  <thead><tr><th>Directive</th><th>CLI</th><th>Description</th></tr></thead>
+  <tbody>
+    <tr><td><code>//terminal</code></td><td>Default shell</td><td>Real bash terminal</td></tr>
+    <tr><td><code>//terminal opencode</code></td><td>OpenCode</td><td>AI coding harness terminal</td></tr>
+    <tr><td><code>//terminal qwen</code></td><td>Qwen</td><td>Alibaba Qwen CLI terminal</td></tr>
+    <tr><td><code>//terminal codex</code></td><td>Codex</td><td>OpenAI Codex terminal</td></tr>
+    <tr><td><code>//terminal agy</code></td><td>Antigravity</td><td>Google Antigravity terminal</td></tr>
+    <tr><td><code>//terminal kilo</code></td><td>Kilo</td><td>Kilo code terminal</td></tr>
+  </tbody>
+</table>
 
 <h2>Directives</h2>
 <table class="docs-table">
   <thead><tr><th>Command</th><th>Effect</th></tr></thead>
   <tbody>
-    <tr><td><code>//whitepaper</code></td><td>Formal document theme: white bg, serif font</td></tr>
-    <tr><td><code>//terminal</code></td><td>Default EMERALD CLI</td></tr>
-    <tr><td><code>//terminal opencode</code></td><td>OpenCode AI coding harness</td></tr>
-    <tr><td><code>//terminal qwen</code></td><td>Qwen general AI assistant</td></tr>
-    <tr><td><code>//terminal codex</code></td><td>Codex code generation</td></tr>
-    <tr><td><code>//terminal agy</code></td><td>Antigravity advanced AI</td></tr>
-    <tr><td><code>//terminal kilo</code></td><td>Kilo minimal fast CLI</td></tr>
+    <tr><td><code>//whitepaper</code></td><td>Formal document theme</td></tr>
+    <tr><td><code>//terminal</code></td><td>Real bash terminal below note</td></tr>
+    <tr><td><code>//terminal &lt;name&gt;</code></td><td>Open real CLI terminal (opencode/codex/qwen/agy/kilo)</td></tr>
   </tbody>
 </table>
 
-<h2>Indentation Hierarchy</h2>
-<pre>!! Product Strategy
-  h2: Goals
-    &gt; Increase revenue 40%
-    &gt; Launch v1
-      ? Compare to Obsidian?
-  + Market Research
-    &bull; Notion: strong databases
-    &bull; Obsidian: great linking</pre>
+<h2>Full Example</h2>
+<pre>//terminal opencode
+# App Spec
+h2: Requirements
+  > User auth with JWT
+  > REST API for todos
+  ? Should we use PostgreSQL?
 
-<h2>Transclusion</h2>
-<pre>{{"{{note:meeting-notes"}}}}</pre>
+Table: Tech Stack
+| Layer     | Choice       |
+|-----------|------------- |
+| Frontend  | React        |
+| Backend   | Node.js      |
+| Database  | PostgreSQL   |</pre>
 
         </div>
       </div>
     </main>
   </div>
+  <script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.js"></script>
   <script src="emerald.js"></script>
   <script src="app.js"></script>
 </body>
