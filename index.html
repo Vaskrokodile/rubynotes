@@ -23,21 +23,10 @@
         <p>Select a note or create a new one</p>
       </div>
       <div id="editor-content" class="editor-content hidden">
-        <div class="editor-tabs">
-          <button id="tab-edit" class="tab">Edit</button>
-          <button id="tab-preview" class="tab active">Preview</button>
-          <span id="note-filename" class="note-filename"></span>
-        </div>
-        <div class="editor-panes">
-          <div id="pane-edit" class="pane hidden">
-            <input id="note-title" class="note-title" placeholder="Title" />
-            <textarea id="note-body" class="note-body" placeholder="Start writing Emerald syntax..."></textarea>
-          </div>
-          <div id="pane-preview" class="pane">
-            <div id="preview-title" class="preview-title"></div>
-            <div id="preview-body" class="preview-body emerald-render"></div>
-          </div>
-        </div>
+        <input id="note-title" class="note-title" placeholder="Title">
+        <textarea id="note-body" class="note-body" placeholder="Start writing Emerald syntax..."></textarea>
+        <div id="live-preview" class="live-preview emerald-render"></div>
+        <div id="cli-container"></div>
         <div class="editor-footer">
           <div class="footer-left">
             <button id="import-btn" class="btn-io">Import .mrld</button>
@@ -75,13 +64,10 @@
 <table class="docs-table">
   <thead><tr><th>Syntax</th><th>Renders</th></tr></thead>
   <tbody>
-    <tr><td><code>**bold**</code></td><td><strong>bold</strong></td></tr>
-    <tr><td><code>__bold__</code></td><td><strong>bold</strong> (alt)</td></tr>
-    <tr><td><code>!bold!</code></td><td><strong>bold</strong> (fastest)</td></tr>
-    <tr><td><code>*italic*</code></td><td><em>italic</em></td></tr>
-    <tr><td><code>_italic_</code></td><td><em>italic</em> (alt)</td></tr>
+    <tr><td><code>**bold**</code> / <code>__bold__</code> / <code>!bold!</code></td><td><strong>bold</strong></td></tr>
+    <tr><td><code>*italic*</code> / <code>_italic_</code></td><td><em>italic</em></td></tr>
     <tr><td><code>`code`</code></td><td><code>inline code</code></td></tr>
-    <tr><td><code>[[note:title]]</code></td><td>wiki link to note</td></tr>
+    <tr><td><code>[[note:title]]</code></td><td>wiki link</td></tr>
     <tr><td><code>[Key: Val | K: V]</code></td><td>inline properties</td></tr>
   </tbody>
 </table>
@@ -101,55 +87,39 @@
     <tr><td><code>Table: Name</code></td><td>Table</td><td><code>Table: Q3 Report</code></td></tr>
     <tr><td><code>Code: lang</code></td><td>Code block</td><td><code>Code: python</code></td></tr>
     <tr><td><code>Kanban: Name</code></td><td>Kanban board</td><td><code>Kanban: Tasks</code></td></tr>
-    <tr><td><code>~ A | B | C ~</code></td><td>Kanban (alt)</td><td>Quick board</td></tr>
     <tr><td><code>Image: url</code></td><td>Image embed</td><td><code>Image: ./chart.png</code></td></tr>
     <tr><td><code>Video: url</code></td><td>Video embed</td><td><code>Video: ./demo.mp4</code></td></tr>
     <tr><td><code>File: path</code></td><td>File reference</td><td><code>File: ./spec.pdf</code></td></tr>
   </tbody>
 </table>
 
-<h2>AI-Native Commands</h2>
+<h2>AI Commands</h2>
 <pre>@ai summarize
 @ai extract action items with deadlines
 @ai find connections to other notes
 @ai generate 3 insights
-@ai critique this strategy</pre>
-<p>Also: <code>@memory fact The auth uses JWT</code> — AI-readable persistent memory tags.</p>
-
-<h2>Contextual Auto-Dates</h2>
-<p>Tasks auto-detect dates from natural language:</p>
-<pre>&gt; Buy milk tomorrow
-&gt; Ship feature next week
-&gt; Review on Friday
-&gt; Deploy 2026-06-01</pre>
+@memory fact The auth uses JWT</pre>
 
 <h2>Tables</h2>
 <pre>Table: Q3 Performance
-| Metric       | Target   | Actual   | Status    |
-|--------------|----------|----------|-----------|
-| Revenue      | $240k    | $218k    | ! Behind  |
-| New Users    | 12k      | 15.2k    | &gt; Good    |</pre>
-<p>Compact variant:</p>
-<pre>Table: Team
-Name | Role | Focus
------|------|------
-Sarah | CEO | Vision
-Mike | CTO | AI</pre>
+| Metric  | Target | Actual  | Status    |
+|---------|--------|---------|-----------|
+| Revenue | $240k  | $218k   | ! Behind  |
+| New     | 12k    | 15.2k   | &gt; Good    |</pre>
 
 <h2>Code Blocks</h2>
 <pre>Code: python
 def analyze_note(text):
     return ai.summarize(text)</pre>
 
-<h2>Kanban Boards</h2>
-<pre>Kanban: Project Tasks
+<h2>Kanban</h2>
+<pre>Kanban: Tasks
 &gt; To Do
-  - Research competitors
-  - Design new icons
+  - Research
 &gt; In Progress
-  - Build Nexus parser
+  - Build parser
 &gt; Done
-  - Define format spec</pre>
+  - Define spec</pre>
 
 <h2>Frontmatter</h2>
 <pre>---
@@ -157,12 +127,21 @@ Project: Nexus
 Status: Active
 Due: 2026-06-15
 Tags: [format, productivity, ai]
-Priority: 9
-Related: [[note:2025-vision]]
 ---</pre>
 
-<h2>Transclusion</h2>
-<pre>{{"{{note:meeting-notes"}}}}</pre>
+<h2>Directives</h2>
+<table class="docs-table">
+  <thead><tr><th>Command</th><th>Effect</th></tr></thead>
+  <tbody>
+    <tr><td><code>//whitepaper</code></td><td>Formal document theme: white bg, serif font</td></tr>
+    <tr><td><code>//terminal</code></td><td>Default EMERALD CLI</td></tr>
+    <tr><td><code>//terminal opencode</code></td><td>OpenCode AI coding harness</td></tr>
+    <tr><td><code>//terminal qwen</code></td><td>Qwen general AI assistant</td></tr>
+    <tr><td><code>//terminal codex</code></td><td>Codex code generation</td></tr>
+    <tr><td><code>//terminal agy</code></td><td>Antigravity advanced AI</td></tr>
+    <tr><td><code>//terminal kilo</code></td><td>Kilo minimal fast CLI</td></tr>
+  </tbody>
+</table>
 
 <h2>Indentation Hierarchy</h2>
 <pre>!! Product Strategy
@@ -171,21 +150,11 @@ Related: [[note:2025-vision]]
     &gt; Launch v1
       ? Compare to Obsidian?
   + Market Research
-    @ Competitor analysis:
-      &bull; Notion: strong databases
-      &bull; Obsidian: great linking
-  ! Risks
-    / Performance with large notes</pre>
+    &bull; Notion: strong databases
+    &bull; Obsidian: great linking</pre>
 
-<h2>Directives</h2>
-<table class="docs-table">
-  <thead><tr><th>Command</th><th>Effect</th></tr></thead>
-  <tbody>
-    <tr><td><code>//whitepaper</code></td><td>Formal document theme: white bg, serif font, justified text</td></tr>
-    <tr><td><code>//terminal</code></td><td>Inline EMERALD AI Coding Harness CLI with note as context</td></tr>
-  </tbody>
-</table>
-        </div>
+<h2>Transclusion</h2>
+<pre>{{"{{note:meeting-notes"}}}}</pre>
 
         </div>
       </div>
