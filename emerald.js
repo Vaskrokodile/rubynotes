@@ -332,7 +332,7 @@ function renderTask(text) {
     var autoDate = parseNaturalDate(text);
     if (autoDate) dueHtml = autoDate;
   }
-  var result = '<input type="checkbox" class="em-checkbox" onclick="return false;"> ' + parsed;
+  var result = '<input type="checkbox" class="em-checkbox"> ' + parsed;
   if (dueHtml) result += ' <span class="em-due">' + dueHtml + '</span>';
   return result;
 }

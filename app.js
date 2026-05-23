@@ -630,7 +630,13 @@ livePreview.addEventListener('input', function() {
   if (!activeId || currentView !== 'editor') return;
   noteBody.value = serializeLivePreview();
   clearTimeout(saveTimer); saveStatus.textContent = 'Saving...';
-  saveTimer = setTimeout(function() { autoSave(); updatePreview(); }, 650);
+  saveTimer = setTimeout(function() { autoSave(); }, 650);
+});
+livePreview.addEventListener('blur', function() {
+  if (!activeId || currentView !== 'editor') return;
+  noteBody.value = serializeLivePreview();
+  autoSave();
+  updatePreview();
 });
 
 newNoteBtn.addEventListener('click', createNote);

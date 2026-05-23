@@ -297,8 +297,13 @@ function normalizeMrldBody(body, fallbackTitle) {
     return normalizeMrldBody(nested.body || nested.mrld, nested.title || fallbackTitle);
   }
 
+  text = text
+    .replace(/^#\s+(.+)$/gm, 'Title: $1')
+    .replace(/^##\s+(.+)$/gm, 'h2: $1')
+    .replace(/^###\s+(.+)$/gm, 'h3: $1')
+    .replace(/^####\s+(.+)$/gm, 'h4: $1');
   if (!text) text = `Title: ${fallbackTitle || 'Voice Idea'}\n\n@ Empty generated note.`;
-  if (!/^(Title:|# |!! )/m.test(text)) text = `Title: ${fallbackTitle || 'Voice Idea'}\n\n${text}`;
+  if (!/^(Title:|!! )/m.test(text)) text = `Title: ${fallbackTitle || 'Voice Idea'}\n\n${text}`;
   return text;
 }
 
@@ -761,6 +766,8 @@ ipcMain.handle('voice:create-note', async (_event, payload = {}) => {
       'Think deeply before writing. Infer sensible missing product, user, workflow, data, risk, and launch details from the idea.',
       'Return exactly one JSON object with keys "title" and "body".',
       'The body must be a plain RubyNotes .mrld string. It must not be Markdown, nested JSON, escaped JSON, duplicated JSON, or a code fence.',
+      'Never use Markdown heading syntax. Do not write #, ##, ###, or #### for headings.',
+      'Use Title: for the document title, h2: for major sections, h3: for subsections, and h4: for small subsections.',
       'Always make the note substantial: aim for 900-1600 words when the prompt is small, unless the idea clearly demands less.',
       'Use RubyNotes syntax richly and correctly:',
       '- Title: for the note title',

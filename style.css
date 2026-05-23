@@ -150,13 +150,9 @@ body {
 
 /* ===================== EMERALD RENDER ===================== */
 .emerald-render h1 { font-size:18px; font-weight:700; color:var(--fg-hi); margin:24px 0 12px; padding-bottom:6px; border-bottom:1px solid var(--border); }
-.emerald-render h1::before { content:"# "; color:var(--green); font-weight:400; }
 .emerald-render h2 { font-size:15px; font-weight:700; color:var(--fg-hi); margin:20px 0 8px; }
-.emerald-render h2::before { content:"## "; color:var(--green); font-weight:400; opacity:.6; }
 .emerald-render h3 { font-size:13px; font-weight:600; color:var(--fg); margin:14px 0 6px; }
-.emerald-render h3::before { content:"### "; color:var(--green); font-weight:400; opacity:.4; }
 .emerald-render h4 { font-size:12px; font-weight:600; color:var(--fg-dim); margin:10px 0 4px; }
-.emerald-render h4::before { content:"#### "; color:var(--green); font-weight:400; opacity:.3; }
 .emerald-render p { margin:6px 0; color:var(--fg); line-height:1.75; }
 .emerald-render strong { color:var(--fg-hi); font-weight:700; }
 .emerald-render em { font-style:italic; }
