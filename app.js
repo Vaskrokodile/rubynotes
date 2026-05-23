@@ -75,14 +75,14 @@ function createNote() {
   notes.push({ id: now.toString(), title: '', body: '', createdAt: now, updatedAt: now });
   saveNotes(); currentView = 'editor'; activeId = notes[notes.length-1].id;
   noteTitle.value = ''; noteBody.value = ''; updatePreview();
-  showEditorView(); renderNotesList(); updateDocsBtn(); noteBody.focus();
+  showEditorView(); renderNotesList(); updateDocsBtn(); livePreview.focus();
 }
 function createNoteFromAi(title, body) {
   var now = Date.now();
-  notes.push({ id: now.toString(), title: title || 'Voice idea', body: body || '', createdAt: now, updatedAt: now });
+  notes.push({ id: now.toString(), title: title || 'Voice idea', body: stripDuplicateBodyTitle(title, body || ''), createdAt: now, updatedAt: now });
   saveNotes(); currentView = 'editor'; activeId = notes[notes.length-1].id;
   noteTitle.value = notes[notes.length-1].title; noteBody.value = notes[notes.length-1].body; updatePreview();
-  showEditorView(); renderNotesList(); updateDocsBtn(); noteBody.focus();
+  showEditorView(); renderNotesList(); updateDocsBtn(); livePreview.focus();
 }
 
 function deleteNote() {
@@ -109,6 +109,16 @@ function showSettingsView() {
 function updateDocsBtn() {
   docsBtn.classList.toggle('active', currentView === 'docs');
   settingsBtn.classList.toggle('active', currentView === 'settings');
+}
+function stripDuplicateBodyTitle(title, body) {
+  var lines = String(body || '').replace(/\r\n/g, '\n').split('\n');
+  var first = (lines[0] || '').trim();
+  var expected = String(title || '').trim().toLowerCase();
+  if (first.toLowerCase() === ('title: ' + expected) || first.toLowerCase() === ('# ' + expected)) {
+    lines.shift();
+    while (lines.length && !lines[0].trim()) lines.shift();
+  }
+  return lines.join('\n').trim();
 }
 function terminalNoteContext(body, cliType) {
   var note = notes.find(function(n) { return n.id === activeId; });
@@ -148,6 +158,8 @@ function updatePreview() {
   else if (/^\/\/terminal\s+agy/m.test(body)) { cliType = 'agy'; body = body.replace(/^\/\/terminal\s+agy\s*\n?/gm, ''); }
   else if (/^\/\/terminal\s+kilo/m.test(body)) { cliType = 'kilo'; body = body.replace(/^\/\/terminal\s+kilo\s*\n?/gm, ''); }
   else if (/^\/\/terminal/m.test(body)) { cliType = 'default'; body = body.replace(/^\/\/terminal\s*\n?/gm, ''); }
+
+  body = stripDuplicateBodyTitle(noteTitle.value, body);
 
   editorContent.classList.toggle('whitepaper', isWhitepaper);
   editorContent.classList.toggle('terminal-mode', !!cliType);
@@ -210,11 +222,11 @@ function handleFileSelect(e) {
 function triggerImport() { importFile.click(); }
 function setupDragDrop() {
   var app = document.querySelector('.app'), dc = 0;
-  app.addEventListener('dragenter', function(e) { e.preventDefault(); e.stopPropagation(); dc++; if (dc===1) noteBody.classList.add('drag-over'); });
-  app.addEventListener('dragleave', function(e) { e.preventDefault(); e.stopPropagation(); dc--; if (dc===0) noteBody.classList.remove('drag-over'); });
+  app.addEventListener('dragenter', function(e) { e.preventDefault(); e.stopPropagation(); dc++; if (dc===1) livePreview.classList.add('drag-over'); });
+  app.addEventListener('dragleave', function(e) { e.preventDefault(); e.stopPropagation(); dc--; if (dc===0) livePreview.classList.remove('drag-over'); });
   app.addEventListener('dragover', function(e) { e.preventDefault(); e.stopPropagation(); });
   app.addEventListener('drop', function(e) {
-    e.preventDefault(); e.stopPropagation(); dc=0; noteBody.classList.remove('drag-over');
+    e.preventDefault(); e.stopPropagation(); dc=0; livePreview.classList.remove('drag-over');
     var files = e.dataTransfer.files; if (!files.length) return;
     for (var i=0; i<files.length; i++) {
       var file = files[i]; if (!file.name.endsWith('.mrld')) continue;
@@ -321,6 +333,45 @@ function openTerminal(type) {
   });
   resizeObserver.observe(termEl);
   terminalDisposables.push(function() { try { resizeObserver.disconnect(); } catch(e) {} });
+}
+function serializeLivePreview() {
+  var lines = [];
+  Array.prototype.forEach.call(livePreview.childNodes, function(node) {
+    serializePreviewNode(node, lines);
+  });
+  return lines.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+}
+function serializePreviewNode(node, lines) {
+  if (node.nodeType === Node.TEXT_NODE) {
+    var text = node.textContent.trim();
+    if (text) lines.push(text);
+    return;
+  }
+  if (node.nodeType !== Node.ELEMENT_NODE) return;
+
+  var tag = node.tagName.toLowerCase();
+  var text = node.innerText.trim();
+  if (!text) return;
+
+  if (tag === 'h1') lines.push('Title: ' + text.replace(/^#\s*/, ''));
+  else if (tag === 'h2') lines.push('h2: ' + text.replace(/^##\s*/, ''));
+  else if (tag === 'h3') lines.push('h3: ' + text.replace(/^###\s*/, ''));
+  else if (tag === 'h4') lines.push('h4: ' + text.replace(/^####\s*/, ''));
+  else if (tag === 'li') {
+    if (node.classList.contains('em-task')) lines.push('> ' + text.replace(/^\s*/, ''));
+    else if (node.classList.contains('em-question')) lines.push('? ' + text.replace(/^\?\s*/, ''));
+    else if (node.classList.contains('em-important')) lines.push('! ' + text.replace(/^!\s*/, ''));
+    else lines.push('- ' + text.replace(/^-\s*/, ''));
+  }
+  else if (tag === 'ul') Array.prototype.forEach.call(node.children, function(child) { serializePreviewNode(child, lines); });
+  else if (node.classList.contains('em-kv')) lines.push('= ' + text.replace(/\s+/g, ' '));
+  else if (node.classList.contains('em-ai')) lines.push('@ai ' + text.replace(/^@ai\s*/, ''));
+  else if (node.classList.contains('em-memory')) lines.push('@memory ' + text.replace(/^MEM\s*/, ''));
+  else if (tag === 'table') lines.push(text);
+  else if (tag === 'pre') lines.push('Code:\n' + text.split('\n').map(function(line) { return '  ' + line; }).join('\n'));
+  else if (tag === 'div' && node.classList.contains('em-table-caption')) lines.push('Table: ' + text.replace(/^Table:\s*/, ''));
+  else if (tag === 'p' || tag === 'div') lines.push('@ ' + text);
+  else lines.push(text);
 }
 
 function updateTerminalContext(type) {
@@ -574,6 +625,12 @@ noteTitle.addEventListener('input', function() {
 noteBody.addEventListener('input', function() {
   clearTimeout(saveTimer); saveStatus.textContent = 'Saving...';
   saveTimer = setTimeout(function() { autoSave(); updatePreview(); }, 400);
+});
+livePreview.addEventListener('input', function() {
+  if (!activeId || currentView !== 'editor') return;
+  noteBody.value = serializeLivePreview();
+  clearTimeout(saveTimer); saveStatus.textContent = 'Saving...';
+  saveTimer = setTimeout(function() { autoSave(); updatePreview(); }, 650);
 });
 
 newNoteBtn.addEventListener('click', createNote);

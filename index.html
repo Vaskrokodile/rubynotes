@@ -32,8 +32,8 @@
       </div>
       <div id="editor-content" class="editor-content hidden">
         <input id="note-title" class="note-title" placeholder="Title">
-        <textarea id="note-body" class="note-body" placeholder="Start writing Emerald syntax..."></textarea>
-        <div id="live-preview" class="live-preview emerald-render"></div>
+        <textarea id="note-body" class="note-body" aria-hidden="true"></textarea>
+        <div id="live-preview" class="live-preview emerald-render" contenteditable="true" spellcheck="true" data-placeholder="Start writing Emerald syntax..."></div>
         <div id="cli-container"></div>
         <div class="editor-footer">
           <div class="footer-left">

@@ -69,22 +69,18 @@ body {
 .note-title::placeholder { color:#333; }
 
 .note-body {
-  width:100%; background:transparent; border:none;
-  color:var(--fg); font-size:13px; line-height:1.75;
-  font-family:var(--font); outline:none; resize:none;
-  padding:14px 24px; min-height:0; flex:1;
-  caret-color:var(--green);
+  display:none;
 }
-.note-body::placeholder { color:#333; }
-.note-body.drag-over { outline:2px dashed var(--green); outline-offset:4px; }
+.live-preview.drag-over { outline:2px dashed var(--green); outline-offset:-8px; }
 
 /* ---- live preview ---- */
 .live-preview {
   width:100%; padding:18px 24px 32px;
-  border-top:1px dashed #1a1a1a;
-  color:var(--fg); line-height:1.75; flex-shrink:0;
+  border-top:none; outline:none;
+  color:var(--fg); line-height:1.75; flex:1;
+  caret-color:var(--green); overflow-y:auto;
 }
-.live-preview:empty { display:none; }
+.live-preview:empty::before { content:attr(data-placeholder); color:#333; }
 .editor-content.terminal-mode .live-preview { display:none; }
 
 /* ---- CLI container (xterm terminals) ---- */
