@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>RubyNotes</title>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css">
+  <link rel="stylesheet" href="node_modules/xterm/css/xterm.css">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -94,16 +94,16 @@
   </tbody>
 </table>
 
-<h2>Terminal CLIs <span style="color:var(--green);font-size:11px">(real terminals via xterm.js)</span></h2>
+<h2>Terminal CLIs <span style="color:var(--green);font-size:11px">(real Electron terminals via xterm.js)</span></h2>
 <table class="docs-table">
   <thead><tr><th>Directive</th><th>CLI</th><th>Description</th></tr></thead>
   <tbody>
-    <tr><td><code>//terminal</code></td><td>Default shell</td><td>Real bash terminal</td></tr>
-    <tr><td><code>//terminal opencode</code></td><td>OpenCode</td><td>AI coding harness terminal</td></tr>
-    <tr><td><code>//terminal qwen</code></td><td>Qwen</td><td>Alibaba Qwen CLI terminal</td></tr>
-    <tr><td><code>//terminal codex</code></td><td>Codex</td><td>OpenAI Codex terminal</td></tr>
-    <tr><td><code>//terminal agy</code></td><td>Antigravity</td><td>Google Antigravity terminal</td></tr>
-    <tr><td><code>//terminal kilo</code></td><td>Kilo</td><td>Kilo code terminal</td></tr>
+    <tr><td><code>//terminal</code></td><td>Default shell</td><td>Opens your real system shell</td></tr>
+    <tr><td><code>//terminal opencode</code></td><td>OpenCode</td><td>Installs <code>opencode-ai</code> if needed, then launches <code>opencode</code></td></tr>
+    <tr><td><code>//terminal qwen</code></td><td>Qwen</td><td>Runs Qwen's installer if needed, then launches <code>qwen</code></td></tr>
+    <tr><td><code>//terminal codex</code></td><td>Codex</td><td>Installs <code>@openai/codex</code> if needed, then launches <code>codex</code></td></tr>
+    <tr><td><code>//terminal agy</code></td><td>Antigravity</td><td>Runs Google's installer if needed, then launches <code>agy</code></td></tr>
+    <tr><td><code>//terminal kilo</code></td><td>Kilo</td><td>Installs <code>@kilocode/cli</code> if needed, then launches <code>kilo</code></td></tr>
   </tbody>
 </table>
 
@@ -112,8 +112,8 @@
   <thead><tr><th>Command</th><th>Effect</th></tr></thead>
   <tbody>
     <tr><td><code>//whitepaper</code></td><td>Formal document theme</td></tr>
-    <tr><td><code>//terminal</code></td><td>Real bash terminal below note</td></tr>
-    <tr><td><code>//terminal &lt;name&gt;</code></td><td>Open real CLI terminal (opencode/codex/qwen/agy/kilo)</td></tr>
+    <tr><td><code>//terminal</code></td><td>Real system terminal below note</td></tr>
+    <tr><td><code>//terminal &lt;name&gt;</code></td><td>Install if missing, then open the real CLI (opencode/codex/qwen/agy/kilo)</td></tr>
   </tbody>
 </table>
 
@@ -136,8 +136,8 @@ Table: Tech Stack
       </div>
     </main>
   </div>
-  <script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.js"></script>
+  <script src="node_modules/xterm/lib/xterm.js"></script>
+  <script src="node_modules/xterm-addon-fit/lib/xterm-addon-fit.js"></script>
   <script src="emerald.js"></script>
   <script src="app.js"></script>
 </body>

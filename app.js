@@ -92,11 +92,16 @@ function updatePreview() {
   else if (/^\/\/terminal/m.test(body)) { cliType = 'default'; body = body.replace(/^\/\/terminal\s*\n?/gm, ''); }
 
   editorContent.classList.toggle('whitepaper', isWhitepaper);
+  editorContent.classList.toggle('terminal-mode', !!cliType);
 
-  try {
-    setEmeraldNotes(notes);
-    livePreview.innerHTML = parseEmerald(body);
-  } catch(e) { livePreview.innerHTML = '<p style="color:var(--red)">Preview error</p>'; }
+  if (cliType) {
+    livePreview.innerHTML = '';
+  } else {
+    try {
+      setEmeraldNotes(notes);
+      livePreview.innerHTML = parseEmerald(body);
+    } catch(e) { livePreview.innerHTML = '<p style="color:var(--red)">Preview error</p>'; }
+  }
 
   if (cliType && activeId) {
     openTerminal(cliType);
@@ -164,11 +169,15 @@ function setupDragDrop() {
   });
 }
 
-/* ===================== REAL TERMINAL (xterm.js + WebSocket) ===================== */
+/* ===================== REAL TERMINAL (Electron PTY + xterm.js) ===================== */
 
 var termInstance = null;
-var termSocket = null;
 var termFitAddon = null;
+var termSessionId = null;
+var termDataUnsubscribe = null;
+var termExitUnsubscribe = null;
+var currentTerminalType = null;
+var terminalDisposables = [];
 
 var CLI_NAMES = {
   default: 'SHELL',
@@ -192,8 +201,11 @@ function terminalColors(type) {
 }
 
 function openTerminal(type) {
+  if (termActive && currentTerminalType === type && termInstance) return;
+
   destroyTerminal();
   termActive = true;
+  currentTerminalType = type;
 
   var displayName = CLI_NAMES[type] || type.toUpperCase();
   var colors = terminalColors(type);
@@ -203,10 +215,10 @@ function openTerminal(type) {
   wrap.style.borderColor = colors.border;
   wrap.innerHTML =
     '<div class="cli-wrap-header">' +
-      '<span>' + esc(displayName) + '  // ' + (displayName === 'SHELL' ? 'real terminal' : 'real CLI') + '</span>' +
+      '<span>' + esc(displayName) + '</span>' +
       '<button class="cli-wrap-close">&times;</button>' +
     '</div>' +
-    '<div class="cli-term" style="height:320px"></div>';
+    '<div class="cli-term"></div>';
 
   cliContainer.appendChild(wrap);
 
@@ -244,35 +256,82 @@ function openTerminal(type) {
 
   var resizeObserver = new ResizeObserver(function() {
     if (termFitAddon) try { termFitAddon.fit(); } catch(e) {}
-    if (termSocket && termSocket.readyState === WebSocket.OPEN && termInstance) {
-      var dims = termInstance._core._renderService.dimensions;
-      if (dims) {
-        termSocket.send(JSON.stringify({ type: 'resize', rows: dims.rows, cols: dims.cols }));
-      }
-    }
+    resizeTerminalSession();
   });
   resizeObserver.observe(termEl);
+  terminalDisposables.push(function() { try { resizeObserver.disconnect(); } catch(e) {} });
 }
 
 function connectTerminal(type) {
+  if (window.rubyNotesTerminal) {
+    connectElectronTerminal(type);
+    return;
+  }
+
+  connectWebSocketTerminal(type);
+}
+
+function connectElectronTerminal(type) {
+  if (!termInstance) return;
+
+  var api = window.rubyNotesTerminal;
+  var id = 'term-' + Date.now() + '-' + Math.random().toString(16).slice(2);
+  termSessionId = id;
+
+  termDataUnsubscribe = api.onData(id, function(data) {
+    if (termInstance) termInstance.write(data);
+  });
+
+  termExitUnsubscribe = api.onExit(id, function(payload) {
+    if (termInstance && termActive) {
+      termInstance.writeln('\r\n\x1b[90m[terminal exited: ' + payload.exitCode + ']\x1b[0m\r\n');
+    }
+  });
+
+  var dataDisposable = termInstance.onData(function(data) {
+    if (termSessionId) api.write(termSessionId, data);
+  });
+  terminalDisposables.push(function() { try { dataDisposable.dispose(); } catch(e) {} });
+
+  api.create({
+    id: id,
+    type: type,
+    cols: termInstance.cols || 100,
+    rows: termInstance.rows || 28
+  }).then(function() {
+    resizeTerminalSession();
+  }).catch(function(err) {
+    if (termInstance) {
+      termInstance.writeln('\r\n\x1b[91m[terminal error: ' + esc(err && err.message ? err.message : err) + ']\x1b[0m\r\n');
+    }
+  });
+}
+
+function resizeTerminalSession() {
+  if (!termInstance || !termSessionId || !window.rubyNotesTerminal) return;
+  try {
+    window.rubyNotesTerminal.resize(termSessionId, termInstance.cols, termInstance.rows);
+  } catch(e) {}
+}
+
+function connectWebSocketTerminal(type) {
   var proto = location.protocol === 'https:' ? 'wss' : 'ws';
   var wsUrl = proto + '://' + location.hostname + ':' + WS_PORT + '/ws/' + type;
 
-  termSocket = new WebSocket(wsUrl);
+  var termSocket = new WebSocket(wsUrl);
   termSocket.binaryType = 'arraybuffer';
+  terminalDisposables.push(function() { try { termSocket.close(); } catch(e) {} });
 
   termSocket.onopen = function() {
     if (termInstance) {
-      termInstance.onData(function(data) {
+      var dataDisposable = termInstance.onData(function(data) {
         if (termSocket && termSocket.readyState === WebSocket.OPEN) {
           termSocket.send(JSON.stringify({ type: 'input', data: data }));
         }
       });
+      terminalDisposables.push(function() { try { dataDisposable.dispose(); } catch(e) {} });
 
-      var dims = termInstance._core._renderService.dimensions;
-      if (dims) {
-        termSocket.send(JSON.stringify({ type: 'resize', rows: dims.rows, cols: dims.cols }));
-      }
+      termSocket.send(JSON.stringify({ type: 'resize', rows: termInstance.rows, cols: termInstance.cols }));
     }
   };
 
@@ -296,16 +355,29 @@ function connectTerminal(type) {
 }
 
 function destroyTerminal() {
+  terminalDisposables.forEach(function(dispose) { try { dispose(); } catch(e) {} });
+  terminalDisposables = [];
+
+  if (termDataUnsubscribe) {
+    try { termDataUnsubscribe(); } catch(e) {}
+    termDataUnsubscribe = null;
+  }
+  if (termExitUnsubscribe) {
+    try { termExitUnsubscribe(); } catch(e) {}
+    termExitUnsubscribe = null;
+  }
+  if (termSessionId && window.rubyNotesTerminal) {
+    try { window.rubyNotesTerminal.dispose(termSessionId); } catch(e) {}
+  }
+  termSessionId = null;
+
   if (termInstance) {
     try { termInstance.dispose(); } catch(e) {}
     termInstance = null;
   }
-  if (termSocket) {
-    try { termSocket.close(); } catch(e) {}
-    termSocket = null;
-  }
   termFitAddon = null;
   termActive = false;
+  currentTerminalType = null;
   cliContainer.innerHTML = '';
 }
 

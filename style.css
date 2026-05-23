@@ -56,8 +56,8 @@ body {
 .note-body {
   width:100%; background:transparent; border:none;
   color:var(--fg); font-size:13px; line-height:1.75;
-  font-family:var(--font); outline:none; resize:vertical;
-  padding:14px 24px; min-height:100px; flex-shrink:0;
+  font-family:var(--font); outline:none; resize:none;
+  padding:14px 24px; min-height:0; flex:1;
   caret-color:var(--green);
 }
 .note-body::placeholder { color:#333; }
@@ -70,16 +70,28 @@ body {
   color:var(--fg); line-height:1.75; flex-shrink:0;
 }
 .live-preview:empty { display:none; }
+.editor-content.terminal-mode .live-preview { display:none; }
 
 /* ---- CLI container (xterm terminals) ---- */
+#cli-container { flex-shrink:0; }
 .cli-wrap {
-  margin:0; border-top:2px solid var(--green); flex-shrink:0;
+  position:relative;
+  margin:0 24px 18px;
+  border:0;
+  border-top:1px solid var(--green);
+  flex-shrink:0;
 }
 .cli-wrap-header {
-  display:flex; justify-content:space-between; align-items:center;
-  padding:6px 16px; background:#080808;
-  font-size:11px; color:var(--green); font-weight:600;
+  position:absolute;
+  top:-18px;
+  right:0;
+  display:flex; justify-content:flex-end; align-items:center;
+  gap:8px;
+  padding:0;
+  background:transparent;
+  font-size:10px; color:var(--fg-dim); font-weight:600;
   text-transform:uppercase; letter-spacing:1px;
+  z-index:2;
 }
 .cli-wrap-close {
   background:transparent; border:none; color:var(--fg-dim);
@@ -87,7 +99,8 @@ body {
   padding:0 4px; line-height:1;
 }
 .cli-wrap-close:hover { color:var(--red); }
-.cli-wrap .xterm { padding:4px; }
+.cli-term { min-height:42vh; height:42vh; padding-top:8px; }
+.cli-wrap .xterm { padding:0; }
 
 /* ---- footer ---- */
 .editor-footer {
