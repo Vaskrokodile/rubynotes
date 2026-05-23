@@ -200,19 +200,106 @@ function extractOutputText(responseJson) {
 
 function parseGeneratedNote(text, transcript) {
   const trimmed = String(text || '').trim();
-  try {
-    const cleaned = trimmed.replace(/^```(?:json)?/i, '').replace(/```$/i, '').trim();
-    const parsed = JSON.parse(cleaned);
+  const parsed = extractGeneratedNoteJson(trimmed);
+  if (parsed) {
     return {
       title: String(parsed.title || 'Voice idea').trim(),
-      body: String(parsed.body || parsed.mrld || '').trim()
-    };
-  } catch {
-    return {
-      title: 'Voice idea',
-      body: trimmed || `Title: Voice Idea\n\nh2: Raw Idea\n@ ${transcript}`
+      body: normalizeMrldBody(String(parsed.body || parsed.mrld || ''), parsed.title || 'Voice idea')
     };
   }
+  const loose = extractLooseGeneratedNote(trimmed);
+  if (loose) {
+    return {
+      title: loose.title,
+      body: normalizeMrldBody(loose.body, loose.title)
+    };
+  }
+
+  return {
+    title: 'Voice idea',
+    body: normalizeMrldBody(trimmed || `Title: Voice Idea\n\nh2: Raw Idea\n@ ${transcript}`, 'Voice idea')
+  };
+}
+
+function extractLooseGeneratedNote(text) {
+  const firstObject = extractFirstJsonObject(text) || text;
+  const titleMatch = firstObject.match(/"title"\s*:\s*"([^"]+)"/);
+  const bodyMatch = firstObject.match(/"body"\s*:\s*"([\s\S]*?)"\s*}/);
+  if (!bodyMatch) return null;
+  return {
+    title: titleMatch ? titleMatch[1] : 'Voice idea',
+    body: unescapeJsonishString(bodyMatch[1])
+  };
+}
+
+function unescapeJsonishString(value) {
+  return String(value || '')
+    .replace(/\\n/g, '\n')
+    .replace(/\\r/g, '\r')
+    .replace(/\\"/g, '"')
+    .replace(/\\\\/g, '\\')
+    .trim();
+}
+
+function extractGeneratedNoteJson(text) {
+  const cleaned = text.replace(/^```(?:json)?/i, '').replace(/```$/i, '').trim();
+  try {
+    return JSON.parse(cleaned);
+  } catch {}
+
+  const first = extractFirstJsonObject(cleaned);
+  if (!first) return null;
+  try {
+    return JSON.parse(first);
+  } catch {
+    return null;
+  }
+}
+
+function extractFirstJsonObject(text) {
+  let depth = 0;
+  let start = -1;
+  let inString = false;
+  let escaped = false;
+
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (escaped) {
+      escaped = false;
+      continue;
+    }
+    if (ch === '\\') {
+      escaped = true;
+      continue;
+    }
+    if (ch === '"') {
+      inString = !inString;
+      continue;
+    }
+    if (inString) continue;
+    if (ch === '{') {
+      if (depth === 0) start = i;
+      depth++;
+    } else if (ch === '}') {
+      depth--;
+      if (depth === 0 && start >= 0) return text.slice(start, i + 1);
+    }
+  }
+  return null;
+}
+
+function normalizeMrldBody(body, fallbackTitle) {
+  let text = String(body || '').replace(/\r\n/g, '\n').trim();
+  text = text.replace(/^```(?:mrld|emerald)?/i, '').replace(/```$/i, '').trim();
+
+  const nested = extractGeneratedNoteJson(text);
+  if (nested && (nested.body || nested.mrld)) {
+    return normalizeMrldBody(nested.body || nested.mrld, nested.title || fallbackTitle);
+  }
+
+  if (!text) text = `Title: ${fallbackTitle || 'Voice Idea'}\n\n@ Empty generated note.`;
+  if (!/^(Title:|# |!! )/m.test(text)) text = `Title: ${fallbackTitle || 'Voice Idea'}\n\n${text}`;
+  return text;
 }
 
 function getShell() {
@@ -670,10 +757,11 @@ ipcMain.handle('voice:create-note', async (_event, payload = {}) => {
 
   const instructions = [
       'You turn spoken ideas into clean RubyNotes .mrld notes.',
-      'Return only JSON with keys "title" and "body".',
+      'Return exactly one JSON object with keys "title" and "body".',
       'The body must be valid RubyNotes .mrld syntax, not Markdown.',
+      'The body value must be a plain .mrld string, not nested JSON and not an escaped JSON document.',
       'Use Title:, h2:, @ paragraphs, > tasks, ? questions, ! warnings, = key-value rows, Table:, Kanban:, and Code: blocks where useful.',
-      'Do not include fenced Markdown code blocks.'
+      'Do not include duplicate JSON objects, fenced code blocks, or explanatory text outside the JSON object.'
     ].join('\n');
   const input = [
       'Convert this spoken idea into a concise, well-structured .mrld note.',

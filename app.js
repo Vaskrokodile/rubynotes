@@ -33,6 +33,8 @@ var voiceShortcutInput = document.getElementById('voice-shortcut');
 var voiceBtn = document.getElementById('voice-btn');
 var voiceTestBtn = document.getElementById('voice-test-btn');
 var voiceStatus = document.getElementById('voice-status');
+var aiWorking = document.getElementById('ai-working');
+var aiWorkingText = document.getElementById('ai-working-text');
 var importBtn = document.getElementById('import-btn');
 var exportBtn = document.getElementById('export-btn');
 var importFile = document.getElementById('import-file');
@@ -77,7 +79,7 @@ function createNote() {
 }
 function createNoteFromAi(title, body) {
   var now = Date.now();
-  notes.push({ id: now.toString(), title: title || 'Voice idea', body: body || '', createdAt: now, updatedAt: now });
+  notes.push({ id: now.toString(), title: title || 'Voice idea', body: body || '', createdAt: now, updatedAt: now, source: 'voice-ai' });
   saveNotes(); currentView = 'editor'; activeId = notes[notes.length-1].id;
   noteTitle.value = notes[notes.length-1].title; noteBody.value = notes[notes.length-1].body; updatePreview();
   showEditorView(); renderNotesList(); updateDocsBtn(); noteBody.focus();
@@ -137,6 +139,7 @@ function updatePreview() {
   if (!activeId) return;
   var body = noteBody.value;
   var isWhitepaper = false, cliType = null;
+  var note = notes.find(function(n) { return n.id === activeId; });
 
   if (/^\/\/whitepaper/m.test(body)) { isWhitepaper = true; body = body.replace(/^\/\/whitepaper\s*\n?/gm, ''); }
   if (/^\/\/terminal\s+opencode/m.test(body)) { cliType = 'opencode'; body = body.replace(/^\/\/terminal\s+opencode\s*\n?/gm, ''); }
@@ -148,8 +151,9 @@ function updatePreview() {
 
   editorContent.classList.toggle('whitepaper', isWhitepaper);
   editorContent.classList.toggle('terminal-mode', !!cliType);
+  editorContent.classList.toggle('source-only', !!(note && note.source === 'voice-ai'));
 
-  if (cliType) {
+  if (cliType || (note && note.source === 'voice-ai')) {
     livePreview.innerHTML = '';
   } else {
     try {
@@ -383,6 +387,10 @@ function setVoiceStatus(text) {
   if (voiceStatus) voiceStatus.textContent = text || '';
   saveStatus.textContent = text || saveStatus.textContent;
 }
+function setAiWorking(active, text) {
+  aiWorking.classList.toggle('hidden', !active);
+  aiWorkingText.textContent = text || 'AI is working';
+}
 
 function loadSettingsForm() {
   if (!window.rubyNotesSettings) return;
@@ -438,6 +446,7 @@ function startVoiceCapture() {
     return;
   }
   setVoiceStatus('Listening...');
+  setAiWorking(true, 'Listening...');
   navigator.mediaDevices.getUserMedia({ audio: true }).then(function(stream) {
     audioChunks = [];
     mediaRecorder = new MediaRecorder(stream);
@@ -449,12 +458,13 @@ function startVoiceCapture() {
       finishVoiceCapture(mediaRecorder.mimeType || 'audio/webm');
     };
     mediaRecorder.start();
-  }).catch(function(err) { setVoiceStatus(err.message || 'Microphone permission denied'); });
+  }).catch(function(err) { setAiWorking(false); setVoiceStatus(err.message || 'Microphone permission denied'); });
 }
 
 function stopVoiceCapture() {
   if (mediaRecorder && recording) {
     setVoiceStatus('Processing voice idea...');
+    setAiWorking(true, 'Processing voice idea...');
     recording = false;
     [voiceBtn, voiceTestBtn].forEach(function(btn) { if (btn) btn.classList.remove('active'); });
     mediaRecorder.stop();
@@ -465,14 +475,18 @@ function finishVoiceCapture(mimeType) {
   var blob = new Blob(audioChunks, { type: mimeType });
   blob.arrayBuffer().then(function(buffer) {
     setVoiceStatus('Transcribing...');
+    setAiWorking(true, 'Transcribing voice...');
     return window.rubyNotesSettings.transcribe(buffer, mimeType);
   }).then(function(result) {
     setVoiceStatus('Writing .mrld note...');
+    setAiWorking(true, 'AI is making clean .mrld notes...');
     return window.rubyNotesSettings.createNote(result.transcript);
   }).then(function(note) {
     createNoteFromAi(note.title, note.body);
+    setAiWorking(false);
     setVoiceStatus('Voice note created');
   }).catch(function(err) {
+    setAiWorking(false);
     setVoiceStatus(err.message || 'Voice note failed');
   });
 }
