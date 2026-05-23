@@ -264,53 +264,104 @@ function formatDate(value) {
   return date.toISOString();
 }
 
-function buildNoteMarkdown(noteContext = {}) {
-  const title = noteContext.title || 'untitled';
-  const body = noteContext.body || '';
+function stripDirectives(body = '') {
+  return String(body)
+    .replace(/^\/\/whitepaper\s*\n?/gm, '')
+    .replace(/^\/\/terminal(?:\s+\S+)?\s*\n?/gm, '')
+    .trim();
+}
+
+function mrldFence(text = '') {
   return [
-    `# ${title}`,
+    'Code: mrld',
+    String(text || '(empty note)')
+      .split('\n')
+      .map((line) => `  ${line}`)
+      .join('\n')
+  ].join('\n');
+}
+
+function buildNoteMrld(noteContext = {}) {
+  const title = noteContext.title || 'untitled';
+  const body = stripDirectives(noteContext.body || '');
+  return [
+    `Title: ${title}`,
+    '= Type: Active RubyNotes note context',
+    `= Updated: ${formatDate(noteContext.updatedAt)}`,
+    `= Note ID: ${noteContext.id || ''}`,
     '',
-    `Updated: ${formatDate(noteContext.updatedAt)}`,
-    '',
-    '## Active Note Body',
+    'h2: Note Body',
     '',
     body || '(empty note)'
   ].join('\n');
 }
 
-function buildAllNotesMarkdown(noteContext = {}) {
+function buildAllNotesMrld(noteContext = {}) {
   const allNotes = Array.isArray(noteContext.notes) ? noteContext.notes : [];
-  if (!allNotes.length) return '# RubyNotes Notes\n\nNo other notes were provided.\n';
+  if (!allNotes.length) return 'Title: RubyNotes Notes\n\n@ No other notes were provided.\n';
 
   return allNotes.map((note) => [
-    `# ${note.title || 'untitled'}`,
+    `Title: ${note.title || 'untitled'}`,
+    `= Updated: ${formatDate(note.updatedAt)}`,
+    `= Note ID: ${note.id || ''}`,
     '',
-    `Updated: ${formatDate(note.updatedAt)}`,
-    '',
-    note.body || '(empty note)'
+    stripDirectives(note.body || '') || '(empty note)'
   ].join('\n')).join('\n\n---\n\n');
 }
 
-function buildAgentsMarkdown(noteContext = {}) {
+function buildAgentMrld(noteContext = {}) {
   const noteTitle = noteContext.title || 'untitled';
-  const noteBody = noteContext.body || '(empty note)';
+  const noteBody = stripDirectives(noteContext.body || '') || '(empty note)';
   return [
-    '# RubyNotes Context',
+    'Title: RubyNotes AI Context',
+    '= Format: .mrld',
+    '= Purpose: Give embedded CLI agents first-class RubyNotes note context',
     '',
-    'You are running inside a RubyNotes embedded terminal.',
-    'Use the active note as first-class context for every answer.',
-    'If the user asks what you see, summarize the active note content below, not only the terminal environment.',
+    'h2: Instructions',
+    '> Treat RubyNotes .mrld as the source of truth.',
+    '> Use the active note context before answering questions.',
+    '> If the user asks what you see, summarize the active note content, not only the terminal environment.',
+    '> Preserve RubyNotes syntax when creating or editing note content.',
+    '> Prefer .mrld examples over Markdown examples.',
     '',
-    'The active note is also available at `RUBYNOTES_NOTE.md`.',
-    'All notes exported from RubyNotes are available at `RUBYNOTES_ALL_NOTES.md`.',
+    'h2: RubyNotes Syntax Quick Reference',
+    '= Title: Title: My Note or # My Note',
+    '= Section: h2: Section',
+    '= Paragraph: @ text or plain text',
+    '= Task: > task text',
+    '= Question: ? question text',
+    '= Warning: ! important text',
+    '= Toggle: + expandable text',
+    '= Key Value: = Key: Value',
+    '= Table: Table: Name followed by pipe rows',
+    '= Code: Code: lang followed by indented code lines',
+    '= Terminal Directive: //terminal opencode | codex | qwen | agy | kilo',
     '',
-    '## Active Note',
+    'h2: Context Files',
+    '= Active Note: RUBYNOTES_NOTE.mrld',
+    '= All Notes: RUBYNOTES_ALL_NOTES.mrld',
+    '= Agent Context: RUBYNOTES_AGENT_CONTEXT.mrld',
     '',
-    `Title: ${noteTitle}`,
+    'h2: Active Note',
+    `= Title: ${noteTitle}`,
     '',
-    '```text',
-    noteBody,
-    '```'
+    mrldFence(noteBody)
+  ].join('\n');
+}
+
+function buildAgentCompatibilityMrld(noteContext = {}) {
+  return [
+    'Title: RubyNotes Agent Context Bridge',
+    '= Format: .mrld content in AGENTS.md compatibility file',
+    '',
+    'h2: Instructions',
+    '> Read RUBYNOTES_AGENT_CONTEXT.mrld before answering.',
+    '> Read RUBYNOTES_NOTE.mrld for the active note.',
+    '> Read RUBYNOTES_ALL_NOTES.mrld when wider notebook context is useful.',
+    '> These files use RubyNotes .mrld syntax, not Markdown.',
+    '> Treat .mrld as the source of truth and preserve RubyNotes syntax.',
+    '',
+    `= Active Note Title: ${noteContext.title || 'untitled'}`
   ].join('\n');
 }
 
@@ -321,13 +372,15 @@ function createTerminalWorkspace(noteContext, type) {
   const root = path.join(app.getPath('userData'), 'terminal-contexts', dirName);
   fs.mkdirSync(root, { recursive: true });
 
-  const noteFile = path.join(root, 'RUBYNOTES_NOTE.md');
-  const allNotesFile = path.join(root, 'RUBYNOTES_ALL_NOTES.md');
+  const noteFile = path.join(root, 'RUBYNOTES_NOTE.mrld');
+  const allNotesFile = path.join(root, 'RUBYNOTES_ALL_NOTES.mrld');
+  const agentContextFile = path.join(root, 'RUBYNOTES_AGENT_CONTEXT.mrld');
   const agentsFile = path.join(root, 'AGENTS.md');
 
-  fs.writeFileSync(noteFile, buildNoteMarkdown(noteContext), 'utf8');
-  fs.writeFileSync(allNotesFile, buildAllNotesMarkdown(noteContext), 'utf8');
-  fs.writeFileSync(agentsFile, buildAgentsMarkdown(noteContext), 'utf8');
+  fs.writeFileSync(noteFile, buildNoteMrld(noteContext), 'utf8');
+  fs.writeFileSync(allNotesFile, buildAllNotesMrld(noteContext), 'utf8');
+  fs.writeFileSync(agentContextFile, buildAgentMrld(noteContext), 'utf8');
+  fs.writeFileSync(agentsFile, buildAgentCompatibilityMrld(noteContext), 'utf8');
 
   return {
     cwd: root,
@@ -338,6 +391,7 @@ function createTerminalWorkspace(noteContext, type) {
       RUBYNOTES_NOTE_BODY: envText(noteContext.body),
       RUBYNOTES_NOTE_FILE: noteFile,
       RUBYNOTES_ALL_NOTES_FILE: allNotesFile,
+      RUBYNOTES_AGENT_CONTEXT_FILE: agentContextFile,
       RUBYNOTES_AGENTS_FILE: agentsFile,
       RUBYNOTES_TERMINAL_TYPE: type
     }
@@ -348,13 +402,15 @@ function writeTerminalWorkspace(workspace, noteContext, type) {
   if (!workspace || !workspace.cwd || !noteContext) return workspace;
 
   fs.mkdirSync(workspace.cwd, { recursive: true });
-  const noteFile = path.join(workspace.cwd, 'RUBYNOTES_NOTE.md');
-  const allNotesFile = path.join(workspace.cwd, 'RUBYNOTES_ALL_NOTES.md');
+  const noteFile = path.join(workspace.cwd, 'RUBYNOTES_NOTE.mrld');
+  const allNotesFile = path.join(workspace.cwd, 'RUBYNOTES_ALL_NOTES.mrld');
+  const agentContextFile = path.join(workspace.cwd, 'RUBYNOTES_AGENT_CONTEXT.mrld');
   const agentsFile = path.join(workspace.cwd, 'AGENTS.md');
 
-  fs.writeFileSync(noteFile, buildNoteMarkdown(noteContext), 'utf8');
-  fs.writeFileSync(allNotesFile, buildAllNotesMarkdown(noteContext), 'utf8');
-  fs.writeFileSync(agentsFile, buildAgentsMarkdown(noteContext), 'utf8');
+  fs.writeFileSync(noteFile, buildNoteMrld(noteContext), 'utf8');
+  fs.writeFileSync(allNotesFile, buildAllNotesMrld(noteContext), 'utf8');
+  fs.writeFileSync(agentContextFile, buildAgentMrld(noteContext), 'utf8');
+  fs.writeFileSync(agentsFile, buildAgentCompatibilityMrld(noteContext), 'utf8');
 
   workspace.noteContext = noteContext;
   workspace.env = {
@@ -364,6 +420,7 @@ function writeTerminalWorkspace(workspace, noteContext, type) {
     RUBYNOTES_NOTE_BODY: envText(noteContext.body),
     RUBYNOTES_NOTE_FILE: noteFile,
     RUBYNOTES_ALL_NOTES_FILE: allNotesFile,
+    RUBYNOTES_AGENT_CONTEXT_FILE: agentContextFile,
     RUBYNOTES_AGENTS_FILE: agentsFile,
     RUBYNOTES_TERMINAL_TYPE: type
   };
