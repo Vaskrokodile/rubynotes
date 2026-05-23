@@ -72,6 +72,7 @@ function renderNotesList() {
 function selectNote(id) {
   currentView = 'editor';
   activeId = id;
+  cliActive = false;
   const note = notes.find(n => n.id === id);
   if (note) {
     noteTitle.value = note.title;
@@ -182,6 +183,10 @@ function updatePreview() {
   } catch (e) {
     previewBody.innerHTML = '<p style="color:var(--red)">Preview error</p>';
   }
+
+  var existing = document.getElementById('em-cli');
+  if (existing) existing.remove();
+  cliActive = false;
 
   if (isTerminal && activeId) {
     appendCLI(previewBody);
