@@ -52,87 +52,101 @@
       </div>
       <div id="docs-content" class="docs-content hidden">
         <div class="docs-wrapper emerald-render">
-<h1>Emerald Syntax Guide <code>.mrld</code></h1>
-<p>Emerald is a fast, intuitive syntax for writing notes — stored as <code>.mrld</code> files (just like Markdown uses <code>.md</code>). Designed to be quicker to type than Markdown while keeping everything readable as plain text. Use the Import / Export buttons to share <code>.mrld</code> files, or drag-and-drop them into the app.</p>
 
-<h2>Titles &amp; Headings</h2>
-<p>Start a line with <code>Title:</code> or <code>!!</code> for a main heading (h1). Use <code>h2:</code>, <code>h3:</code>, <code>h4:</code> for subheadings.</p>
-<pre>Title: My Meeting Notes
-!! Quarterly Review
-h2: Agenda
-h3: Action Items
-h4: Follow-ups</pre>
-<p><strong>Markdown equivalent:</strong> <code>#</code>, <code>##</code>, <code>###</code>, <code>####</code> — Emerald saves keystrokes by using readable prefixes.</p>
+<h1>Emerald Syntax <code>.mrld</code></h1>
+<p>Emerald is a fast, intuitive syntax for writing notes — stored as <code>.mrld</code> files (the equivalent of Markdown's <code>.md</code>). Single-character prefixes and indentation-based hierarchy make it faster to type than Markdown, while keeping plain text readable.</p>
+
+<h2>Block Prefixes <span style="color:#4f8;font-size:14px">(single character)</span></h2>
+<table class="docs-table">
+  <thead><tr><th>Prefix</th><th>Name</th><th>Example</th></tr></thead>
+  <tbody>
+    <tr><td><code># </code></td><td>Page title</td><td><code># My Meeting Notes</code></td></tr>
+    <tr><td><code>!! </code></td><td>Page title (alt)</td><td><code>!! Quarterly Review</code></td></tr>
+    <tr><td><code>Title: </code></td><td>Page title (alt)</td><td><code>Title: Sprint Plan</code></td></tr>
+    <tr><td><code>h2: </code></td><td>Heading 2</td><td><code>h2: Agenda</code></td></tr>
+    <tr><td><code>h3: </code></td><td>Heading 3</td><td><code>h3: Action Items</code></td></tr>
+    <tr><td><code>h4: </code></td><td>Heading 4</td><td><code>h4: Follow-ups</code></td></tr>
+    <tr><td><code>@ </code></td><td>Paragraph</td><td><code>@ This is a normal paragraph</code></td></tr>
+    <tr><td><code>- </code></td><td>Bullet list</td><td><code>- Buy groceries</code></td></tr>
+    <tr><td><code>&bull; </code></td><td>Bullet (alt)</td><td><code>&bull; Faster alternative</code></td></tr>
+    <tr><td><code>&gt; </code></td><td>Task</td><td><code>&gt; Fix login bug @due(2026-06-01)</code></td></tr>
+    <tr><td><code>? </code></td><td>Question</td><td><code>? What blockers do we have?</code></td></tr>
+    <tr><td><code>! </code></td><td>Warning</td><td><code>! Production outage</code></td></tr>
+    <tr><td><code>/ </code></td><td>Comment</td><td><code>/ This is hidden in the preview</code></td></tr>
+    <tr><td><code>+ </code></td><td>Toggle</td><td><code>+ Competitor analysis</code></td></tr>
+    <tr><td><code>= </code></td><td>Key-value</td><td><code>= Status: In Progress</code></td></tr>
+  </tbody>
+</table>
 
 <h2>Bold / Emphasis</h2>
-<p>Three ways to bold text — pick whichever is fastest for you:</p>
-<pre>**double asterisks** — classic, familiar
-__double underscore__ — shorter
-!single bang! — fastest, one character per side</pre>
-<p>All produce <strong>bold text</strong> in the preview.</p>
+<p>Three ways to bold text — use whichever is fastest:</p>
+<pre>**double asterisks** — classic Markdown familiar
+__double underscore__ — shorter to type
+!single bang! — fastest, one character</pre>
 
-<h2>Lists</h2>
-<p>Emerald has four list types, each starting with a different symbol:</p>
+<h2>Indentation Hierarchy</h2>
+<p><strong>One tab or two spaces = one level deeper.</strong> No need for list markers on every line when nesting under a parent.</p>
+<pre>Meeting with Sarah
+  &gt; Discuss Q3 goals
+    - Revenue target: $2.4M
+    ? What blockers do we have?
+  + Competitor analysis
+    &bull; Linear: 40% faster
+    &bull; Cursor: better UX
+  = Owner: Sarah
+  = Priority: High</pre>
 
-<h3>Standard List</h3>
-<pre>- Buy groceries
-- Call dentist
-- Review PR</pre>
+<h2>Tasks with Due Dates</h2>
+<p>Add <code>@due(date)</code> to any task for deadline tracking:</p>
+<pre>&gt; Ship v2.0 @due(2026-06-15)
+&gt; Review security audit @due(tomorrow)</pre>
 
-<h3>Task List</h3>
-<p>Start with <code>&gt;</code> to create an actionable task with a checkbox. Add <code>@due(date)</code> to set a due date.</p>
-<pre>&gt; Fix login bug
-&gt; Update dependencies @due(2026-06-01)
-&gt; Write unit tests @due(tomorrow)</pre>
+<h2>Comments</h2>
+<p>Lines starting with <code>/ </code> are hidden in the Preview tab — keep private notes in plain sight while editing, invisible when presenting.</p>
+<pre>/ TODO: verify these numbers with finance
+&gt; Q3 revenue: $4.2M
+&gt; Q4 projection: $5.1M</pre>
 
-<h3>Question List</h3>
-<p>Start with <code>?</code> to mark open questions — great for meetings, research, and AI prompts.</p>
-<pre>? What's the timeline for Q3?
-? Who owns the design review?
-? Should we migrate to TypeScript?</pre>
+<h2>Key-Value Properties</h2>
+<p>Use <code>= </code> for structured metadata at any indent level:</p>
+<pre>= Status: In Progress
+  = Owner: Sarah Chen
+  = Due: 2026-06-01</pre>
 
-<h3>Priority List</h3>
-<p>Start with <code>! </code> (bang + space) to flag high-priority items. Renders with a <span class="em-prio">HIGH</span> badge.</p>
-<pre>! Fix production outage
-! Security patch for CVE-2026
-! Prepare board deck</pre>
+<h2>Toggles</h2>
+<p>Use <code>+ </code> for collapsible sections. Click the summary to expand/collapse:</p>
+<pre>+ Implementation details
+  - Uses WebSocket for real-time sync
+  - Backed by SQLite
+  - Rate limited at 100 req/s</pre>
 
-<h2>Combining Syntax</h2>
-<p>You can nest inline formatting inside any block element:</p>
-<pre>h2: !Critical! Updates
-- **Must read** before the meeting
-&gt; Review !security! patch @due(2026-05-30)
-? Why is the __latency__ spiking?</pre>
-
-<h2>Quick Reference</h2>
+<h2>Quick Reference vs Markdown</h2>
 <table class="docs-table">
-  <thead>
-    <tr><th>Emerald</th><th>Renders As</th><th>vs Markdown</th></tr>
-  </thead>
+  <thead><tr><th>Emerald</th><th>Renders</th><th>Markdown</th></tr></thead>
   <tbody>
-    <tr><td><code>Title: Hello</code></td><td>h1 heading</td><td># Hello</td></tr>
-    <tr><td><code>!! Hello</code></td><td>h1 heading</td><td># Hello</td></tr>
-    <tr><td><code>h2: Hello</code></td><td>h2 heading</td><td>## Hello</td></tr>
-    <tr><td><code>h3: Hello</code></td><td>h3 heading</td><td>### Hello</td></tr>
-    <tr><td><code>**bold**</code></td><td><strong>bold</strong></td><td>**bold**</td></tr>
-    <tr><td><code>__bold__</code></td><td><strong>bold</strong></td><td>—</td></tr>
-    <tr><td><code>!bold!</code></td><td><strong>bold</strong></td><td>—</td></tr>
-    <tr><td><code>- item</code></td><td>bullet list</td><td>- item</td></tr>
-    <tr><td><code>&gt; task</code></td><td>checkbox task</td><td>- [ ] task</td></tr>
-    <tr><td><code>? question</code></td><td>open question</td><td>—</td></tr>
-    <tr><td><code>! priority</code></td><td>high priority</td><td>—</td></tr>
+    <tr><td><code># Title</code></td><td>h1</td><td><code># Title</code></td></tr>
+    <tr><td><code>h2: Section</code></td><td>h2</td><td><code>## Section</code></td></tr>
+    <tr><td><code>&gt; task</code></td><td>checkbox</td><td><code>- [ ] task</code></td></tr>
+    <tr><td><code>? question</code></td><td>highlighted Q</td><td>—</td></tr>
+    <tr><td><code>! warning</code></td><td>red badge</td><td>—</td></tr>
+    <tr><td><code>/ comment</code></td><td>hidden</td><td><code>&lt;!-- --&gt;</code></td></tr>
+    <tr><td><code>+ toggle</code></td><td>collapsible</td><td><code>&lt;details&gt;</code></td></tr>
+    <tr><td><code>= key: val</code></td><td>key-value row</td><td>—</td></tr>
+    <tr><td>indentation</td><td>nested hierarchy</td><td>sub-lists</td></tr>
   </tbody>
 </table>
 
 <h2>Design Philosophy</h2>
-<p><strong>Emerald beats Markdown</strong> because it optimizes for the most common note-taking patterns:</p>
+<p><strong>Emerald beats Markdown</strong> because it optimizes for real note-taking:</p>
 <ul class="em-list">
-  <li>Headings use natural language prefixes (<code>h2:</code>) instead of counting <code>#</code> symbols</li>
-  <li>Tasks, questions, and priorities are first-class citizens — no need for nested Markdown + HTML + CSS</li>
-  <li>Multiple bold syntaxes let you choose what's fastest on your keyboard layout</li>
-  <li>Due dates are parsed natively so your task list doubles as a deadline tracker</li>
-  <li>Plain text is always readable — Emerald is designed to look clean even before rendering</li>
+  <li>Single-character prefixes: <code>#</code> <code>&gt;</code> <code>?</code> <code>!</code> <code>/</code> <code>+</code> <code>=</code> — fast to type, easy to scan</li>
+  <li>Indentation is hierarchy — one tab nests under the parent, no extra syntax needed</li>
+  <li>Tasks, questions, warnings, toggles, and key-values are first-class citizens</li>
+  <li>Comments exist in your editor but vanish in the preview</li>
+  <li><code>@due(date)</code> is native deadline syntax, not a plugin</li>
+  <li><code>.mrld</code> files are plain text — readable anywhere, even without RubyNotes</li>
 </ul>
+
         </div>
       </div>
     </main>

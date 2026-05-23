@@ -3,75 +3,161 @@ function parseEmerald(text) {
   let html = '';
   let inList = false;
   let listType = '';
+  let indentStack = [];
+  let toggleDepth = -1;
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
     const trimmed = line.trim();
+    const indent = countIndent(line);
 
     if (trimmed === '') {
-      if (inList) { html += '</ul>'; inList = false; listType = ''; }
+      closeList();
+      closeDownTo(0);
+      toggleDepth = -1;
       continue;
     }
 
-    if (trimmed.startsWith('!! ')) {
+    const type = detectType(trimmed);
+    const content = stripPrefix(trimmed, type);
+
+    if (type === 'comment') continue;
+
+    if (indent < indentStack.length) {
+      closeDownTo(indent);
+      if (toggleDepth >= indent) toggleDepth = indent - 1;
+    }
+
+    if (type === 'toggle') {
       closeList();
-      html += '<h1>' + parseInline(trimmed.slice(3)) + '</h1>';
-    } else if (trimmed.startsWith('Title: ')) {
-      closeList();
-      html += '<h1>' + parseInline(trimmed.slice(7)) + '</h1>';
-    } else if (trimmed.startsWith('h2: ')) {
-      closeList();
-      html += '<h2>' + parseInline(trimmed.slice(4)) + '</h2>';
-    } else if (trimmed.startsWith('h3: ')) {
-      closeList();
-      html += '<h3>' + parseInline(trimmed.slice(4)) + '</h3>';
-    } else if (trimmed.startsWith('h4: ')) {
-      closeList();
-      html += '<h4>' + parseInline(trimmed.slice(4)) + '</h4>';
-    } else if (trimmed.startsWith('> ')) {
-      openList('task');
-      html += '<li class="em-task">' + parseTask(trimmed.slice(2)) + '</li>';
-    } else if (trimmed.startsWith('? ')) {
-      openList('question');
-      html += '<li class="em-question"><span class="em-qmark">?</span> ' + parseInline(trimmed.slice(2)) + '</li>';
-    } else if (trimmed.match(/^!\s/) && !trimmed.startsWith('!! ')) {
-      openList('important');
-      html += '<li class="em-important"><span class="em-prio">HIGH</span> ' + parseInline(trimmed.slice(2)) + '</li>';
-    } else if (trimmed.startsWith('- ')) {
-      openList('ul');
-      html += '<li>' + parseInline(trimmed.slice(2)) + '</li>';
+      closeDownTo(indent);
+      html += '<details class="em-toggle"' + (indent > 0 ? ' style="margin-left:' + (indent * 24) + 'px"' : '') + '>';
+      html += '<summary>' + parseInline(content) + '</summary>';
+      toggleDepth = indent;
+      indentStack.push(indent + 1);
+      continue;
+    }
+
+    const isListItem = type === 'task' || type === 'question' || type === 'warning' || type === 'list' || type === 'bullet';
+    if (isListItem) {
+      const effType = type === 'bullet' ? 'list' : type === 'warning' ? 'important' : type;
+      if (!inList || listType !== effType || indent !== (indentStack.length > 0 ? indentStack[indentStack.length - 1] : 0)) {
+        closeList();
+        html += '<ul class="em-' + effType + '-list"' + (indent > 0 ? ' style="margin-left:' + (indent * 24) + 'px"' : '') + '>';
+        inList = true;
+        listType = effType;
+      }
+      html += renderListItem(type, content);
     } else {
       closeList();
-      html += '<p>' + parseInline(trimmed) + '</p>';
+      html += renderBlock(type, content, indent);
     }
   }
 
   closeList();
+  closeDownTo(0);
   return html;
 
   function closeList() {
     if (inList) { html += '</ul>'; inList = false; listType = ''; }
   }
 
-  function openList(type) {
-    if (!inList || listType !== type) {
-      closeList();
-      const cls = type === 'task' ? 'em-task-list' : type === 'question' ? 'em-question-list' : type === 'important' ? 'em-important-list' : 'em-list';
-      html += '<ul class="' + cls + '">';
-      inList = true;
-      listType = type;
+  function closeDownTo(level) {
+    while (indentStack.length > level) {
+      const popped = indentStack.pop();
+      if (popped === toggleDepth + 1 && toggleDepth >= 0) {
+        html += '</details>';
+        toggleDepth = -1;
+      } else {
+        html += '</div>';
+      }
     }
   }
 }
 
-function parseInline(text) {
-  text = text.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
-  text = text.replace(/__(.+?)__/g, '<strong>$1</strong>');
-  text = text.replace(/!([^!\s][^!]*[^!\s]|[^!\s])!/g, '<strong>$1</strong>');
-  return text;
+function countIndent(line) {
+  let tabs = 0;
+  let spaces = 0;
+  for (const c of line) {
+    if (c === '\t') tabs++;
+    else if (c === ' ') spaces++;
+    else break;
+  }
+  return tabs + Math.floor(spaces / 2);
 }
 
-function parseTask(text) {
+function detectType(trimmed) {
+  if (trimmed.startsWith('# ')) return 'h1';
+  if (trimmed.startsWith('!! ')) return 'h1';
+  if (trimmed.startsWith('Title: ')) return 'h1';
+  if (trimmed.startsWith('h2: ')) return 'h2';
+  if (trimmed.startsWith('h3: ')) return 'h3';
+  if (trimmed.startsWith('h4: ')) return 'h4';
+  if (trimmed.startsWith('> ')) return 'task';
+  if (trimmed.startsWith('? ')) return 'question';
+  if (trimmed.match(/^!\s/) && !trimmed.startsWith('!! ')) return 'warning';
+  if (trimmed.startsWith('/ ')) return 'comment';
+  if (trimmed.startsWith('+ ')) return 'toggle';
+  if (trimmed.startsWith('= ')) return 'kv';
+  if (trimmed.startsWith('- ')) return 'list';
+  if (trimmed.startsWith('\u2022 ')) return 'bullet';
+  if (trimmed.startsWith('@ ')) return 'paragraph';
+  return 'paragraph';
+}
+
+function stripPrefix(trimmed, type) {
+  if (type === 'h1') {
+    if (trimmed.startsWith('# ')) return trimmed.slice(2);
+    if (trimmed.startsWith('!! ')) return trimmed.slice(3);
+    return trimmed.slice(7);
+  }
+  const lengths = {
+    h2: 4, h3: 4, h4: 4,
+    task: 2, question: 2, warning: 2,
+    comment: 2, toggle: 2, kv: 2,
+    list: 2, bullet: 2,
+  };
+  if (lengths[type]) return trimmed.slice(lengths[type]);
+  if (type === 'paragraph' && trimmed.startsWith('@ ')) return trimmed.slice(2);
+  return trimmed;
+}
+
+function renderBlock(type, content, indent) {
+  const parsed = parseInline(content);
+  const pad = indent > 0 ? ' style="margin-left:' + (indent * 24) + 'px"' : '';
+  switch (type) {
+    case 'h1': return '<h1>' + parsed + '</h1>';
+    case 'h2': return '<h2>' + parsed + '</h2>';
+    case 'h3': return '<h3>' + parsed + '</h3>';
+    case 'h4': return '<h4>' + parsed + '</h4>';
+    case 'kv': {
+      const colon = content.indexOf(':');
+      if (colon > 0) {
+        const key = parseInline(content.slice(0, colon).trim());
+        const val = parseInline(content.slice(colon + 1).trim());
+        return '<div class="em-kv"' + pad + '><span class="em-kv-key">' + key + '</span><span class="em-kv-val">' + val + '</span></div>';
+      }
+      return '<div class="em-kv"' + pad + '>' + parsed + '</div>';
+    }
+    default: return '<p' + pad + '>' + parsed + '</p>';
+  }
+}
+
+function renderListItem(type, content) {
+  const parsed = parseInline(content);
+  switch (type) {
+    case 'task':
+      return '<li class="em-task">' + parseTaskInternal(content) + '</li>';
+    case 'question':
+      return '<li class="em-question"><span class="em-qmark">?</span> ' + parsed + '</li>';
+    case 'warning':
+      return '<li class="em-important"><span class="em-prio">!</span> ' + parsed + '</li>';
+    default:
+      return '<li>' + parsed + '</li>';
+  }
+}
+
+function parseTaskInternal(text) {
   let dueDate = '';
   const dueMatch = text.match(/@due\((.+?)\)/);
   if (dueMatch) {
@@ -83,4 +169,11 @@ function parseTask(text) {
     result += ' <span class="em-due">' + dueDate + '</span>';
   }
   return result;
+}
+
+function parseInline(text) {
+  text = text.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+  text = text.replace(/__(.+?)__/g, '<strong>$1</strong>');
+  text = text.replace(/!([^!\s][^!]*[^!\s]|[^!\s])!/g, '<strong>$1</strong>');
+  return text;
 }

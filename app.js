@@ -3,7 +3,6 @@ const STORAGE_KEY = 'rubynotes';
 let notes = [];
 let activeId = null;
 let currentView = 'editor';
-let currentMode = 'preview';
 
 const notesList = document.getElementById('notes-list');
 const editorEmpty = document.getElementById('editor-empty');
@@ -116,7 +115,7 @@ function createNote() {
   updateFilename();
   updatePreview();
   showEditorView();
-  setMode('preview');
+  setMode('edit');
   renderNotesList();
   updateDocsBtn();
 }
@@ -162,7 +161,6 @@ function updateDocsBtn() {
 }
 
 function setMode(mode) {
-  currentMode = mode;
   if (mode === 'edit') {
     tabEdit.classList.add('active');
     tabPreview.classList.remove('active');
