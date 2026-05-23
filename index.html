@@ -31,7 +31,7 @@
         <div class="editor-panes">
           <div id="pane-edit" class="pane hidden">
             <input id="note-title" class="note-title" placeholder="Title" />
-            <textarea id="note-body" class="note-body" placeholder="Start writing in Emerald syntax..."></textarea>
+            <textarea id="note-body" class="note-body" placeholder="Start writing Emerald syntax..."></textarea>
           </div>
           <div id="pane-preview" class="pane">
             <div id="preview-title" class="preview-title"></div>
@@ -54,97 +54,105 @@
         <div class="docs-wrapper emerald-render">
 
 <h1>Emerald Syntax <code>.mrld</code></h1>
-<p>Emerald is a fast, intuitive syntax for writing notes — stored as <code>.mrld</code> files (the equivalent of Markdown's <code>.md</code>). Single-character prefixes and indentation-based hierarchy make it faster to type than Markdown, while keeping plain text readable.</p>
+<p>Emerald is a fast, terminal-native syntax for notes. Single-character prefixes and indentation hierarchy make it the fastest way to write structured notes. <code>.mrld</code> files are plain text — readable in any editor.</p>
 
-<h2>Block Prefixes <span style="color:#4f8;font-size:14px">(single character)</span></h2>
+<h2>Block Prefixes</h2>
 <table class="docs-table">
   <thead><tr><th>Prefix</th><th>Name</th><th>Example</th></tr></thead>
   <tbody>
-    <tr><td><code># </code></td><td>Page title</td><td><code># My Meeting Notes</code></td></tr>
-    <tr><td><code>!! </code></td><td>Page title (alt)</td><td><code>!! Quarterly Review</code></td></tr>
-    <tr><td><code>Title: </code></td><td>Page title (alt)</td><td><code>Title: Sprint Plan</code></td></tr>
+    <tr><td><code># </code></td><td>Page title (h1)</td><td><code># Sprint Review</code></td></tr>
+    <tr><td><code>!! </code></td><td>Title (alt)</td><td><code>!! Quarterly Goals</code></td></tr>
+    <tr><td><code>Title: </code></td><td>Title (alt)</td><td><code>Title: Meeting Notes</code></td></tr>
     <tr><td><code>h2: </code></td><td>Heading 2</td><td><code>h2: Agenda</code></td></tr>
     <tr><td><code>h3: </code></td><td>Heading 3</td><td><code>h3: Action Items</code></td></tr>
     <tr><td><code>h4: </code></td><td>Heading 4</td><td><code>h4: Follow-ups</code></td></tr>
-    <tr><td><code>@ </code></td><td>Paragraph</td><td><code>@ This is a normal paragraph</code></td></tr>
-    <tr><td><code>- </code></td><td>Bullet list</td><td><code>- Buy groceries</code></td></tr>
-    <tr><td><code>&bull; </code></td><td>Bullet (alt)</td><td><code>&bull; Faster alternative</code></td></tr>
-    <tr><td><code>&gt; </code></td><td>Task</td><td><code>&gt; Fix login bug @due(2026-06-01)</code></td></tr>
-    <tr><td><code>? </code></td><td>Question</td><td><code>? What blockers do we have?</code></td></tr>
-    <tr><td><code>! </code></td><td>Warning</td><td><code>! Production outage</code></td></tr>
-    <tr><td><code>/ </code></td><td>Comment</td><td><code>/ This is hidden in the preview</code></td></tr>
-    <tr><td><code>+ </code></td><td>Toggle</td><td><code>+ Competitor analysis</code></td></tr>
+    <tr><td><code>@ </code></td><td>Paragraph</td><td><code>@ Status update goes here</code></td></tr>
+    <tr><td><code>- </code></td><td>Bullet list</td><td><code>- Review the PR</code></td></tr>
+    <tr><td><code>&bull; </code></td><td>Bullet (alt)</td><td><code>&bull; Another point</code></td></tr>
+    <tr><td><code>&gt; </code></td><td>Task + checkbox</td><td><code>&gt; Deploy hotfix @due(2026-06-01)</code></td></tr>
+    <tr><td><code>? </code></td><td>Open question</td><td><code>? When does Q3 planning start?</code></td></tr>
+    <tr><td><code>! </code></td><td>Warning</td><td><code>! SSL cert expires Friday</code></td></tr>
+    <tr><td><code>/ </code></td><td>Comment (hidden)</td><td><code>/ TODO: verify with legal</code></td></tr>
+    <tr><td><code>+ </code></td><td>Toggle section</td><td><code>+ Implementation details</code></td></tr>
     <tr><td><code>= </code></td><td>Key-value</td><td><code>= Status: In Progress</code></td></tr>
   </tbody>
 </table>
 
-<h2>Bold / Emphasis</h2>
-<p>Three ways to bold text — use whichever is fastest:</p>
-<pre>**double asterisks** — classic Markdown familiar
-__double underscore__ — shorter to type
-!single bang! — fastest, one character</pre>
+<h2>AI-Native Commands</h2>
+<p>Lines starting with <code>@ai</code> are rendered as AI command blocks. These are first-class citizens — an AI agent can detect and execute them directly from your notes.</p>
+<pre>@ai analyze sentiment
+@ai extract action items
+@ai generate summary
+@ai relate to: "Project Alpha"</pre>
+<p>Each renders with a green accent bar and <strong>@ai</strong> label. Future: AI agents can hook into these to run commands against the note content.</p>
+
+<h2>Smart Properties</h2>
+
+<h3>Frontmatter Block</h3>
+<p>YAML-like but faster. Open with <code>---</code> at the top of a note, close with <code>---</code>. Properties render as a metadata panel.</p>
+<pre>---
+Project: Nexus
+Due: 2026-06-01
+Tags: [product, ai, format]
+Priority: 9
+---
+# Q3 Planning
+h2: Key Decisions
+- Migrate backend to Rust</pre>
+
+<h3>Inline Properties</h3>
+<p>Quick metadata in a single line. Wrap in <code>[ ]</code> with <code>|</code> separators.</p>
+<pre>@ Status update [Priority: P9 | Owner: Sarah | Due: Fri]</pre>
+<p>Or use tags without values: <code>[blocked | needs-review | backend]</code>.</p>
 
 <h2>Indentation Hierarchy</h2>
-<p><strong>One tab or two spaces = one level deeper.</strong> No need for list markers on every line when nesting under a parent.</p>
+<p>Two spaces or one tab = one level deeper. No extra markers needed for children.</p>
 <pre>Meeting with Sarah
-  &gt; Discuss Q3 goals
+  &gt; Discuss Q3 goals @due(Friday)
     - Revenue target: $2.4M
-    ? What blockers do we have?
+    ? What blockers exist?
   + Competitor analysis
     &bull; Linear: 40% faster
     &bull; Cursor: better UX
   = Owner: Sarah
   = Priority: High</pre>
 
-<h2>Tasks with Due Dates</h2>
-<p>Add <code>@due(date)</code> to any task for deadline tracking:</p>
-<pre>&gt; Ship v2.0 @due(2026-06-15)
-&gt; Review security audit @due(tomorrow)</pre>
+<h2>Bold Text</h2>
+<p>Three syntaxes — use whichever is fastest:</p>
+<pre>**double asterisks**   // classic
+__double underscores__  // shorter
+!single bangs!          // fastest</pre>
 
 <h2>Comments</h2>
-<p>Lines starting with <code>/ </code> are hidden in the Preview tab — keep private notes in plain sight while editing, invisible when presenting.</p>
-<pre>/ TODO: verify these numbers with finance
-&gt; Q3 revenue: $4.2M
-&gt; Q4 projection: $5.1M</pre>
-
-<h2>Key-Value Properties</h2>
-<p>Use <code>= </code> for structured metadata at any indent level:</p>
-<pre>= Status: In Progress
-  = Owner: Sarah Chen
-  = Due: 2026-06-01</pre>
-
-<h2>Toggles</h2>
-<p>Use <code>+ </code> for collapsible sections. Click the summary to expand/collapse:</p>
-<pre>+ Implementation details
-  - Uses WebSocket for real-time sync
-  - Backed by SQLite
-  - Rate limited at 100 req/s</pre>
+<p>Lines with <code>/ </code> are hidden in Preview. Write reminders, TODOs, or private notes that stay invisible when sharing your screen.</p>
 
 <h2>Quick Reference vs Markdown</h2>
 <table class="docs-table">
-  <thead><tr><th>Emerald</th><th>Renders</th><th>Markdown</th></tr></thead>
+  <thead><tr><th>Emerald</th><th>Result</th><th>Markdown</th></tr></thead>
   <tbody>
     <tr><td><code># Title</code></td><td>h1</td><td><code># Title</code></td></tr>
     <tr><td><code>h2: Section</code></td><td>h2</td><td><code>## Section</code></td></tr>
-    <tr><td><code>&gt; task</code></td><td>checkbox</td><td><code>- [ ] task</code></td></tr>
+    <tr><td><code>&gt; task @due(date)</code></td><td>checkbox + deadline</td><td><code>- [ ] task</code></td></tr>
     <tr><td><code>? question</code></td><td>highlighted Q</td><td>—</td></tr>
-    <tr><td><code>! warning</code></td><td>red badge</td><td>—</td></tr>
-    <tr><td><code>/ comment</code></td><td>hidden</td><td><code>&lt;!-- --&gt;</code></td></tr>
+    <tr><td><code>! warning</code></td><td>red alert badge</td><td>—</td></tr>
+    <tr><td><code>/ comment</code></td><td>hidden in preview</td><td><code>&lt;!-- --&gt;</code></td></tr>
     <tr><td><code>+ toggle</code></td><td>collapsible</td><td><code>&lt;details&gt;</code></td></tr>
-    <tr><td><code>= key: val</code></td><td>key-value row</td><td>—</td></tr>
+    <tr><td><code>= Key: Value</code></td><td>metadata row</td><td>—</td></tr>
+    <tr><td><code>@ai command</code></td><td>AI command block</td><td>—</td></tr>
+    <tr><td><code>---</code> frontmatter</td><td>metadata panel</td><td>YAML frontmatter</td></tr>
+    <tr><td><code>[K: V | K: V]</code></td><td>inline properties</td><td>—</td></tr>
     <tr><td>indentation</td><td>nested hierarchy</td><td>sub-lists</td></tr>
   </tbody>
 </table>
 
-<h2>Design Philosophy</h2>
-<p><strong>Emerald beats Markdown</strong> because it optimizes for real note-taking:</p>
+<h2>Why Emerald Beats Markdown</h2>
 <ul class="em-list">
-  <li>Single-character prefixes: <code>#</code> <code>&gt;</code> <code>?</code> <code>!</code> <code>/</code> <code>+</code> <code>=</code> — fast to type, easy to scan</li>
-  <li>Indentation is hierarchy — one tab nests under the parent, no extra syntax needed</li>
-  <li>Tasks, questions, warnings, toggles, and key-values are first-class citizens</li>
-  <li>Comments exist in your editor but vanish in the preview</li>
-  <li><code>@due(date)</code> is native deadline syntax, not a plugin</li>
-  <li><code>.mrld</code> files are plain text — readable anywhere, even without RubyNotes</li>
+  <li>Single-char prefixes: <code>#</code> <code>&gt;</code> <code>?</code> <code>!</code> <code>/</code> <code>+</code> <code>=</code> <code>@</code> — type fast, scan fast</li>
+  <li>Indentation IS hierarchy — one tab nests, no extra syntax</li>
+  <li>AI commands are first-class: <code>@ai</code> blocks an AI agent can detect and execute</li>
+  <li>Frontmatter and inline properties for structured metadata — both readable as plain text</li>
+  <li>Comments exist while editing but vanish in Preview — private notes, public rendering</li>
+  <li><code>.mrld</code> files are plain text — works in vim, nano, VS Code, anywhere</li>
 </ul>
 
         </div>

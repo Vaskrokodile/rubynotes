@@ -5,11 +5,33 @@ function parseEmerald(text) {
   let listType = '';
   let indentStack = [];
   let toggleDepth = -1;
+  let inFrontmatter = false;
+  let fmHtml = '';
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
     const trimmed = line.trim();
     const indent = countIndent(line);
+
+    if (inFrontmatter) {
+      if (trimmed === '---') {
+        fmHtml += '</div>';
+        html += fmHtml;
+        inFrontmatter = false;
+        continue;
+      }
+      fmHtml += renderFmRow(trimmed);
+      continue;
+    }
+
+    if (trimmed === '---') {
+      closeList();
+      closeDownTo(0);
+      toggleDepth = -1;
+      fmHtml = '<div class="em-frontmatter">';
+      inFrontmatter = true;
+      continue;
+    }
 
     if (trimmed === '') {
       closeList();
@@ -54,6 +76,7 @@ function parseEmerald(text) {
     }
   }
 
+  if (inFrontmatter) { fmHtml += '</div>'; html += fmHtml; }
   closeList();
   closeDownTo(0);
   return html;
@@ -87,12 +110,15 @@ function countIndent(line) {
 }
 
 function detectType(trimmed) {
+  if (trimmed === '---') return 'fm';
   if (trimmed.startsWith('# ')) return 'h1';
   if (trimmed.startsWith('!! ')) return 'h1';
   if (trimmed.startsWith('Title: ')) return 'h1';
   if (trimmed.startsWith('h2: ')) return 'h2';
   if (trimmed.startsWith('h3: ')) return 'h3';
   if (trimmed.startsWith('h4: ')) return 'h4';
+  if (trimmed.startsWith('@ai ')) return 'ai';
+  if (trimmed.startsWith('@ ')) return 'paragraph';
   if (trimmed.startsWith('> ')) return 'task';
   if (trimmed.startsWith('? ')) return 'question';
   if (trimmed.match(/^!\s/) && !trimmed.startsWith('!! ')) return 'warning';
@@ -101,7 +127,6 @@ function detectType(trimmed) {
   if (trimmed.startsWith('= ')) return 'kv';
   if (trimmed.startsWith('- ')) return 'list';
   if (trimmed.startsWith('\u2022 ')) return 'bullet';
-  if (trimmed.startsWith('@ ')) return 'paragraph';
   return 'paragraph';
 }
 
@@ -113,7 +138,7 @@ function stripPrefix(trimmed, type) {
   }
   const lengths = {
     h2: 4, h3: 4, h4: 4,
-    task: 2, question: 2, warning: 2,
+    ai: 4, task: 2, question: 2, warning: 2,
     comment: 2, toggle: 2, kv: 2,
     list: 2, bullet: 2,
   };
@@ -130,6 +155,8 @@ function renderBlock(type, content, indent) {
     case 'h2': return '<h2>' + parsed + '</h2>';
     case 'h3': return '<h3>' + parsed + '</h3>';
     case 'h4': return '<h4>' + parsed + '</h4>';
+    case 'ai':
+      return '<div class="em-ai"' + pad + '><span class="em-ai-label">@ai</span> ' + parsed + '</div>';
     case 'kv': {
       const colon = content.indexOf(':');
       if (colon > 0) {
@@ -157,6 +184,16 @@ function renderListItem(type, content) {
   }
 }
 
+function renderFmRow(trimmed) {
+  const colon = trimmed.indexOf(':');
+  if (colon > 0) {
+    const key = trimmed.slice(0, colon).trim();
+    const val = trimmed.slice(colon + 1).trim();
+    return '<div class="em-fm-row"><span class="em-fm-key">' + escapeParser(key) + '</span><span class="em-fm-val">' + parseInline(val) + '</span></div>';
+  }
+  return '<div class="em-fm-row"><span class="em-fm-val">' + parseInline(trimmed) + '</span></div>';
+}
+
 function parseTaskInternal(text) {
   let dueDate = '';
   const dueMatch = text.match(/@due\((.+?)\)/);
@@ -175,5 +212,31 @@ function parseInline(text) {
   text = text.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
   text = text.replace(/__(.+?)__/g, '<strong>$1</strong>');
   text = text.replace(/!([^!\s][^!]*[^!\s]|[^!\s])!/g, '<strong>$1</strong>');
+
+  text = text.replace(/\[([^\]]+)\]/g, function(match, inner) {
+    if (inner.includes(':') || inner.includes('|')) {
+      const parts = inner.split('|').map(function(p) { return p.trim(); });
+      let result = '<span class="em-inline-prop">';
+      parts.forEach(function(part) {
+        const colon = part.indexOf(':');
+        if (colon > 0) {
+          result += '<span class="em-ip-key">' + part.slice(0, colon).trim() + '</span>';
+          result += '<span class="em-ip-sep">:</span>';
+          result += '<span class="em-ip-val">' + part.slice(colon + 1).trim() + '</span>';
+        } else {
+          result += '<span class="em-ip-tag">' + part + '</span>';
+        }
+        result += ' ';
+      });
+      result += '</span>';
+      return result;
+    }
+    return match;
+  });
+
   return text;
+}
+
+function escapeParser(str) {
+  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
