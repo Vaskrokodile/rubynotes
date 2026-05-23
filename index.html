@@ -161,6 +161,29 @@ h2: Project Beta
 __double underscores__ // shorter
 !single bangs!         // fastest</pre>
 
+<h2>Directives <span style="color:var(--green);font-size:12px">(note-level commands)</span></h2>
+<p>Lines starting with <code>//</code> change how the entire note renders.</p>
+
+<h3>//whitepaper</h3>
+<p>Transforms the note into a formal document: white background, dark serif text, justified paragraphs, centered title. Perfect for reports, proposals, and documentation.</p>
+<pre>//whitepaper
+# Q3 Strategy Proposal
+h2: Executive Summary
+@ This document outlines our strategic direction for Q3 2026...</pre>
+
+<h3>//terminal</h3>
+<p>Opens an <strong>opencode terminal session</strong> at the bottom of the screen, pre-loaded with the current note as context. The terminal has access to the full note content — you can type <code>build this app</code> and it processes your note as the specification.</p>
+<pre>//terminal
+# My App Spec
+> User authentication with JWT
+> REST API for CRUD operations
+> PostgreSQL database schema
+@ Then type "build this app" in the terminal.</pre>
+<p>Terminal commands: <code>help</code> <code>context</code> <code>tasks</code> <code>explain</code> <code>build</code> <code>clear</code> <code>exit</code></p>
+
+<h2>Self-Opening .mrld Files</h2>
+<p>When you export a <code>.mrld</code> file, it's a self-contained HTML document. Double-click it in any OS — it opens in your browser and renders the Emerald content. The complete parser and styles are embedded in the file. No app needed to view.</p>
+
 <h2>Quick Reference vs Markdown</h2>
 <table class="docs-table">
   <thead><tr><th>Emerald</th><th>Result</th><th>Markdown</th></tr></thead>
@@ -181,6 +204,8 @@ __double underscores__ // shorter
     <tr><td><code>---</code> frontmatter</td><td>metadata panel</td><td>YAML fm</td></tr>
     <tr><td><code>[K: V | K: V]</code></td><td>inline props</td><td>—</td></tr>
     <tr><td><code>{{"{{note:title"}}}}</code></td><td>transclusion</td><td>—</td></tr>
+    <tr><td><code>//whitepaper</code></td><td>formal document theme</td><td>—</td></tr>
+    <tr><td><code>//terminal</code></td><td>opencode terminal</td><td>—</td></tr>
     <tr><td>indentation</td><td>nested hierarchy</td><td>sub-lists</td></tr>
   </tbody>
 </table>
@@ -190,11 +215,24 @@ __double underscores__ // shorter
   <li><strong>Auto-dates</strong> — <code>&gt; buy milk tomorrow</code> auto-adds the due date. Markdown can't parse natural language.</li>
   <li><strong>Tables &amp; kanban</strong> — first-class semantic blocks, not just styling conventions</li>
   <li><strong>Transclusion</strong> — <code>{{"{{note:title"}}}}</code> embeds notes inside notes. Dashboards, roll-ups, cross-references.</li>
-  <li><strong>AI-native</strong> — <code>@ai</code> commands and <code>@memory</code> tags are machine-detectable. Your AI agent can read your notes and act on them.</li>
+  <li><strong>Directives</strong> — <code>//whitepaper</code> for formal docs, <code>//terminal</code> opens an AI terminal with note context</li>
+  <li><strong>AI-native</strong> — <code>@ai</code> commands and <code>@memory</code> tags are machine-detectable</li>
+  <li><strong>Self-opening .mrld</strong> — exported files open in any browser, no app needed</li>
   <li><strong>Smart properties</strong> — frontmatter + inline <code>[K: V]</code> for structured metadata</li>
   <li><strong>Comments that vanish</strong> — <code>/ private note</code> hidden in Preview, visible while editing</li>
 </ul>
 
+        </div>
+      </div>
+      <div id="terminal-panel" class="terminal-panel">
+        <div class="terminal-header">
+          <span>opencode</span>
+          <button id="terminal-close" class="terminal-close">&times;</button>
+        </div>
+        <div id="terminal-output" class="terminal-output"></div>
+        <div class="terminal-input-line">
+          <span class="terminal-prompt">$</span>
+          <input id="terminal-input" class="terminal-input" placeholder="Type a command..." />
         </div>
       </div>
     </main>
