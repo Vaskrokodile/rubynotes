@@ -53,173 +53,139 @@
       <div id="docs-content" class="docs-content hidden">
         <div class="docs-wrapper emerald-render">
 
-<h1>Emerald <code>.mrld</code> Syntax</h1>
-<p>Emerald is a terminal-native syntax for structured notes. Single-character prefixes, indentation hierarchy, tables, kanban, transclusion, AI commands, and smart properties — all faster to type than Markdown.</p>
+<h1>Emerald <code>.mrld</code> — Complete Syntax Reference</h1>
+<p>Emerald is a terminal-native syntax for structured notes. Single-character prefixes, indentation hierarchy, native AI commands, and semantic blocks — all faster to type than Markdown. <code>.mrld</code> files are plain text, self-rendering HTML when exported.</p>
 
-<h2>Block Prefixes</h2>
+<h2>Headings</h2>
+<table class="docs-table">
+  <thead><tr><th>Syntax</th><th>Renders</th><th>MD Equivalent</th></tr></thead>
+  <tbody>
+    <tr><td><code># Title</code></td><td>h1</td><td><code># Title</code></td></tr>
+    <tr><td><code>!! Title</code></td><td>h1</td><td>—</td></tr>
+    <tr><td><code>Title: Title</code></td><td>h1</td><td>—</td></tr>
+    <tr><td><code>## Section</code></td><td>h2</td><td><code>## Section</code></td></tr>
+    <tr><td><code>h2: Section</code></td><td>h2</td><td><code>## Section</code></td></tr>
+    <tr><td><code>### Sub</code></td><td>h3</td><td><code>### Sub</code></td></tr>
+    <tr><td><code>h3: Sub</code></td><td>h3</td><td>—</td></tr>
+    <tr><td><code>h4: Sub</code></td><td>h4</td><td><code>#### Sub</code></td></tr>
+  </tbody>
+</table>
+
+<h2>Inline Formatting</h2>
+<table class="docs-table">
+  <thead><tr><th>Syntax</th><th>Renders</th></tr></thead>
+  <tbody>
+    <tr><td><code>**bold**</code></td><td><strong>bold</strong></td></tr>
+    <tr><td><code>__bold__</code></td><td><strong>bold</strong> (alt)</td></tr>
+    <tr><td><code>!bold!</code></td><td><strong>bold</strong> (fastest)</td></tr>
+    <tr><td><code>*italic*</code></td><td><em>italic</em></td></tr>
+    <tr><td><code>_italic_</code></td><td><em>italic</em> (alt)</td></tr>
+    <tr><td><code>`code`</code></td><td><code>inline code</code></td></tr>
+    <tr><td><code>[[note:title]]</code></td><td>wiki link to note</td></tr>
+    <tr><td><code>[Key: Val | K: V]</code></td><td>inline properties</td></tr>
+  </tbody>
+</table>
+
+<h2>Block Types</h2>
 <table class="docs-table">
   <thead><tr><th>Prefix</th><th>Name</th><th>Example</th></tr></thead>
   <tbody>
-    <tr><td><code># </code></td><td>Page title</td><td><code># Sprint Review</code></td></tr>
-    <tr><td><code>!! </code></td><td>Title (alt)</td><td><code>!! Quarterly Goals</code></td></tr>
-    <tr><td><code>Title: </code></td><td>Title (alt)</td><td><code>Title: Meeting Notes</code></td></tr>
-    <tr><td><code>h2: </code> <code>h3: </code> <code>h4: </code></td><td>Headings</td><td><code>h2: Agenda</code></td></tr>
-    <tr><td><code>@ </code></td><td>Paragraph</td><td><code>@ Status update here</code></td></tr>
-    <tr><td><code>- </code> / <code>&bull; </code></td><td>Bullet list</td><td><code>- Review the PR</code></td></tr>
-    <tr><td><code>&gt; </code></td><td>Task + checkbox</td><td><code>&gt; Deploy hotfix @due(Fri)</code></td></tr>
-    <tr><td><code>? </code></td><td>Open question</td><td><code>? When does Q3 start?</code></td></tr>
-    <tr><td><code>! </code></td><td>Warning / critical</td><td><code>! SSL cert expires Friday</code></td></tr>
-    <tr><td><code>/ </code></td><td>Comment (hidden)</td><td><code>/ TODO: verify numbers</code></td></tr>
-    <tr><td><code>+ </code></td><td>Toggle section</td><td><code>+ Implementation notes</code></td></tr>
-    <tr><td><code>= </code></td><td>Key-value</td><td><code>= Status: In Progress</code></td></tr>
+    <tr><td><code>@ </code></td><td>Paragraph</td><td><code>@ Status update</code></td></tr>
+    <tr><td><code>- / &bull;</code></td><td>Bullet list</td><td><code>- Item</code></td></tr>
+    <tr><td><code>&gt; </code></td><td>Task + checkbox</td><td><code>&gt; Deploy @due(Fri)</code></td></tr>
+    <tr><td><code>? </code></td><td>Question / AI query</td><td><code>? What is the timeline?</code></td></tr>
+    <tr><td><code>! </code></td><td>Warning / alert</td><td><code>! SSL cert expires</code></td></tr>
+    <tr><td><code>/ </code></td><td>Comment (hidden)</td><td><code>/ TODO: verify</code></td></tr>
+    <tr><td><code>+ </code></td><td>Toggle section</td><td><code>+ Details</code></td></tr>
+    <tr><td><code>= </code></td><td>Key-value</td><td><code>= Status: Active</code></td></tr>
+    <tr><td><code>Table: Name</code></td><td>Table</td><td><code>Table: Q3 Report</code></td></tr>
+    <tr><td><code>Code: lang</code></td><td>Code block</td><td><code>Code: python</code></td></tr>
+    <tr><td><code>Kanban: Name</code></td><td>Kanban board</td><td><code>Kanban: Tasks</code></td></tr>
+    <tr><td><code>~ A | B | C ~</code></td><td>Kanban (alt)</td><td>Quick board</td></tr>
+    <tr><td><code>Image: url</code></td><td>Image embed</td><td><code>Image: ./chart.png</code></td></tr>
+    <tr><td><code>Video: url</code></td><td>Video embed</td><td><code>Video: ./demo.mp4</code></td></tr>
+    <tr><td><code>File: path</code></td><td>File reference</td><td><code>File: ./spec.pdf</code></td></tr>
   </tbody>
 </table>
-
-<h2>Contextual Auto-Dates <span style="color:var(--green);font-size:12px">(Markdown can't do this)</span></h2>
-<p>Task lines auto-detect dates from natural language — no <code>@due()</code> needed:</p>
-<pre>&gt; Buy milk tomorrow
-&gt; Ship feature next week
-&gt; Review PR on Friday
-&gt; Deploy on 2026-06-01</pre>
-<p><strong>Words detected:</strong> <code>tomorrow</code> <code>today</code> <code>next week</code> <code>monday</code>—<code>sunday</code> <code>next monday</code> and ISO dates <code>YYYY-MM-DD</code>. The due date badge appears automatically in the preview.</p>
-
-<h2>Tables</h2>
-<p>Pipe-delimited rows. First line is the header. Optional separator line with <code>---</code> in each cell.</p>
-<pre>| Name      | Role       | Status   |
-|-----------|------------|----------|
-| Sarah     | PM         | Active   |
-| James     | Engineer   | Inactive |
-| Maya      | Designer   | Active   |</pre>
-
-<h2>Kanban Boards</h2>
-<p>Start a board with <code>~ column | names ~</code>. Add items with <code>[ColumnName]</code> prefix.</p>
-<pre>~ TODO | DOING | DONE ~
-[TODO] Write API docs
-[TODO] Set up CI pipeline
-[DOING] Fix login timeout
-[DONE] Ship v2.0</pre>
 
 <h2>AI-Native Commands</h2>
-<p>Lines with <code>@ai</code> render as AI command blocks. An AI agent can detect and execute them:</p>
-<pre>@ai analyze sentiment
-@ai extract action items
-@ai generate summary
-@ai relate to: "Project Alpha"</pre>
+<pre>@ai summarize
+@ai extract action items with deadlines
+@ai find connections to other notes
+@ai generate 3 insights
+@ai critique this strategy</pre>
+<p>Also: <code>@memory fact The auth uses JWT</code> — AI-readable persistent memory tags.</p>
 
-<h2>AI Memory Tags</h2>
-<p>Use <code>@memory</code> to mark content the AI should remember across sessions:</p>
-<pre>@memory important The auth flow uses JWT + refresh tokens
-@memory todo Migrate billing to Stripe by Q4
-@memory fact Our biggest customer is Acme Corp (40% rev)</pre>
-<p>Renders with a yellow <strong>MEM</strong> badge — AI agents can index these across all notes for persistent context.</p>
+<h2>Contextual Auto-Dates</h2>
+<p>Tasks auto-detect dates from natural language:</p>
+<pre>&gt; Buy milk tomorrow
+&gt; Ship feature next week
+&gt; Review on Friday
+&gt; Deploy 2026-06-01</pre>
 
-<h2>Calendar Events</h2>
-<p>Lines starting with <code>@YYYY-MM-DD</code> render as calendar entries:</p>
-<pre>@2026-06-01 Q3 planning meeting
-@2026-06-15 Ship v2.0 release
-@2026-07-01 Board presentation</pre>
+<h2>Tables</h2>
+<pre>Table: Q3 Performance
+| Metric       | Target   | Actual   | Status    |
+|--------------|----------|----------|-----------|
+| Revenue      | $240k    | $218k    | ! Behind  |
+| New Users    | 12k      | 15.2k    | &gt; Good    |</pre>
+<p>Compact variant:</p>
+<pre>Table: Team
+Name | Role | Focus
+-----|------|------
+Sarah | CEO | Vision
+Mike | CTO | AI</pre>
 
-<h2>Smart Properties</h2>
+<h2>Code Blocks</h2>
+<pre>Code: python
+def analyze_note(text):
+    return ai.summarize(text)</pre>
 
-<h3>Frontmatter Block</h3>
+<h2>Kanban Boards</h2>
+<pre>Kanban: Project Tasks
+&gt; To Do
+  - Research competitors
+  - Design new icons
+&gt; In Progress
+  - Build Nexus parser
+&gt; Done
+  - Define format spec</pre>
+
+<h2>Frontmatter</h2>
 <pre>---
 Project: Nexus
-Due: 2026-06-01
-Tags: [product, ai, format]
+Status: Active
+Due: 2026-06-15
+Tags: [format, productivity, ai]
 Priority: 9
----
-# Q3 Planning
-h2: Key Decisions</pre>
-
-<h3>Inline Properties</h3>
-<pre>@ Status update [Priority: P9 | Owner: Sarah | Due: Fri]
-@ Architecture review [blocked | needs-approval | backend]</pre>
+Related: [[note:2025-vision]]
+---</pre>
 
 <h2>Transclusion</h2>
-<p>Embed another note inline with <code>{{"{{note:title"}}}}</code>. The referenced note renders inside a purple bordered card:</p>
-<pre># Weekly Standup
-h2: Project Alpha
-{{"{{note:project-alpha-status"}}}}
-h2: Project Beta
-{{"{{note:project-beta-notes"}}}}</pre>
-<p>Perfect for dashboards, roll-up notes, and cross-referencing.</p>
+<pre>{{"{{note:meeting-notes"}}}}</pre>
 
 <h2>Indentation Hierarchy</h2>
-<p>Two spaces or one tab = one level deeper:</p>
-<pre>Meeting with Sarah
-  &gt; Discuss Q3 goals @due(Friday)
-    - Revenue target: $2.4M
-    ? What blockers exist?
-  + Competitor analysis
-    &bull; Linear: 40% faster
-    &bull; Cursor: better UX
-  = Owner: Sarah
-  = Priority: High</pre>
+<pre>!! Product Strategy
+  h2: Goals
+    &gt; Increase revenue 40%
+    &gt; Launch v1
+      ? Compare to Obsidian?
+  + Market Research
+    @ Competitor analysis:
+      &bull; Notion: strong databases
+      &bull; Obsidian: great linking
+  ! Risks
+    / Performance with large notes</pre>
 
-<h2>Bold Text</h2>
-<pre>**double asterisks**  // classic Markdown
-__double underscores__ // shorter
-!single bangs!         // fastest</pre>
-
-<h2>Directives <span style="color:var(--green);font-size:12px">(note-level commands)</span></h2>
-<p>Lines starting with <code>//</code> change how the entire note renders.</p>
-
-<h3>//whitepaper</h3>
-<p>Transforms the note into a formal document: white background, dark serif text, justified paragraphs, centered title. Perfect for reports, proposals, and documentation.</p>
-<pre>//whitepaper
-# Q3 Strategy Proposal
-h2: Executive Summary
-@ This document outlines our strategic direction for Q3 2026...</pre>
-
-<h3>//terminal</h3>
-<p>Adds an inline <strong>EMERALD AI Coding Harness</strong> terminal below the note content — with a big green EMERALD banner styled like opencode. The terminal has the full note as context. You can type <code>build this app</code>, <code>explain the architecture</code>, or <code>review the spec</code> — it understands your note and responds accordingly.</p>
-<pre>//terminal
-# My App Spec
-> User authentication with JWT
-> REST API for CRUD operations
-> PostgreSQL database schema</pre>
-<p><strong>CLI commands:</strong> <code>help</code> <code>context</code> <code>tasks</code> <code>explain</code> <code>build</code> <code>review</code> <code>arch</code> <code>clear</code> <code>exit</code>. Arrow-up/down for history.</p>
-
-<h2>Self-Opening .mrld Files</h2>
-<p>When you export a <code>.mrld</code> file, it's a self-contained HTML document. Double-click it in any OS — it opens in your browser and renders the Emerald content. The complete parser and styles are embedded in the file. No app needed to view.</p>
-
-<h2>Quick Reference vs Markdown</h2>
+<h2>Directives</h2>
 <table class="docs-table">
-  <thead><tr><th>Emerald</th><th>Result</th><th>Markdown</th></tr></thead>
+  <thead><tr><th>Command</th><th>Effect</th></tr></thead>
   <tbody>
-    <tr><td><code># Title</code></td><td>h1</td><td><code># Title</code></td></tr>
-    <tr><td><code>h2: Sec</code></td><td>h2</td><td><code>## Sec</code></td></tr>
-    <tr><td><code>&gt; task tomorrow</code></td><td>checkbox + auto-date</td><td><code>- [ ] task</code></td></tr>
-    <tr><td><code>? question</code></td><td>highlighted Q</td><td>—</td></tr>
-    <tr><td><code>! warning</code></td><td>red alert</td><td>—</td></tr>
-    <tr><td><code>/ comment</code></td><td>hidden</td><td><code>&lt;!-- --&gt;</code></td></tr>
-    <tr><td><code>+ toggle</code></td><td>collapsible</td><td><code>&lt;details&gt;</code></td></tr>
-    <tr><td><code>= K: V</code></td><td>metadata row</td><td>—</td></tr>
-    <tr><td><code>| col | col |</code></td><td>table</td><td><code>| col | col |</code></td></tr>
-    <tr><td><code>~ TODO | DOING ~</code></td><td>kanban board</td><td>—</td></tr>
-    <tr><td><code>@ai command</code></td><td>AI command block</td><td>—</td></tr>
-    <tr><td><code>@memory fact</code></td><td>memory tag</td><td>—</td></tr>
-    <tr><td><code>@2026-06-01 Evt</code></td><td>calendar entry</td><td>—</td></tr>
-    <tr><td><code>---</code> frontmatter</td><td>metadata panel</td><td>YAML fm</td></tr>
-    <tr><td><code>[K: V | K: V]</code></td><td>inline props</td><td>—</td></tr>
-    <tr><td><code>{{"{{note:title"}}}}</code></td><td>transclusion</td><td>—</td></tr>
-    <tr><td><code>//whitepaper</code></td><td>formal document theme</td><td>—</td></tr>
-    <tr><td><code>//terminal</code></td><td>opencode terminal</td><td>—</td></tr>
-    <tr><td>indentation</td><td>nested hierarchy</td><td>sub-lists</td></tr>
+    <tr><td><code>//whitepaper</code></td><td>Formal document theme: white bg, serif font, justified text</td></tr>
+    <tr><td><code>//terminal</code></td><td>Inline EMERALD AI Coding Harness CLI with note as context</td></tr>
   </tbody>
 </table>
-
-<h2>Why Emerald Beats Markdown</h2>
-<ul class="em-list">
-  <li><strong>Auto-dates</strong> — <code>&gt; buy milk tomorrow</code> auto-adds the due date. Markdown can't parse natural language.</li>
-  <li><strong>Tables &amp; kanban</strong> — first-class semantic blocks, not just styling conventions</li>
-  <li><strong>Transclusion</strong> — <code>{{"{{note:title"}}}}</code> embeds notes inside notes. Dashboards, roll-ups, cross-references.</li>
-  <li><strong>Directives</strong> — <code>//whitepaper</code> for formal docs, <code>//terminal</code> opens an AI terminal with note context</li>
-  <li><strong>AI-native</strong> — <code>@ai</code> commands and <code>@memory</code> tags are machine-detectable</li>
-  <li><strong>Self-opening .mrld</strong> — exported files open in any browser, no app needed</li>
-  <li><strong>Smart properties</strong> — frontmatter + inline <code>[K: V]</code> for structured metadata</li>
-  <li><strong>Comments that vanish</strong> — <code>/ private note</code> hidden in Preview, visible while editing</li>
-</ul>
+        </div>
 
         </div>
       </div>
