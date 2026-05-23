@@ -123,7 +123,7 @@
 <table class="docs-table">
   <thead><tr><th>Setting</th><th>Effect</th></tr></thead>
   <tbody>
-    <tr><td><code>OpenAI API key</code></td><td>Enables voice transcription and idea cleanup</td></tr>
+    <tr><td><code>Provider API key</code></td><td>Use OpenAI or Grok/xAI for voice transcription and idea cleanup</td></tr>
     <tr><td><code>Voice Idea</code></td><td>Records your idea, transcribes it, and creates a clean <code>.mrld</code> note</td></tr>
     <tr><td><code>Shortcut</code></td><td>Starts or stops voice capture from anywhere in RubyNotes</td></tr>
   </tbody>
@@ -158,15 +158,24 @@ Table: Tech Stack
               <span>Provider</span>
               <select id="ai-provider">
                 <option value="openai">OpenAI</option>
+                <option value="xai">Grok / xAI</option>
               </select>
             </label>
             <label class="settings-field">
-              <span>API Key</span>
+              <span>OpenAI API Key</span>
               <input id="openai-api-key" type="password" placeholder="sk-...">
             </label>
             <label class="settings-field">
-              <span>Base URL</span>
+              <span>OpenAI Base URL</span>
               <input id="openai-base-url" type="text" placeholder="https://api.openai.com/v1">
+            </label>
+            <label class="settings-field">
+              <span>Grok API Key</span>
+              <input id="xai-api-key" type="password" placeholder="xai-...">
+            </label>
+            <label class="settings-field">
+              <span>Grok Base URL</span>
+              <input id="xai-base-url" type="text" placeholder="https://api.x.ai/v1">
             </label>
           </div>
           <div class="settings-section">
@@ -178,6 +187,14 @@ Table: Tech Stack
             <label class="settings-field">
               <span>Transcription Model</span>
               <input id="transcription-model" type="text" placeholder="gpt-4o-mini-transcribe">
+            </label>
+            <label class="settings-field">
+              <span>Grok Model</span>
+              <input id="xai-text-model" type="text" placeholder="grok-4.3">
+            </label>
+            <label class="settings-field">
+              <span>Grok STT Language</span>
+              <input id="xai-transcription-language" type="text" placeholder="en">
             </label>
             <label class="settings-field">
               <span>Shortcut</span>

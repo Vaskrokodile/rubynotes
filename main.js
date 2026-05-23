@@ -94,6 +94,10 @@ function defaultSettings() {
     aiProvider: 'openai',
     openaiApiKey: '',
     openaiBaseUrl: 'https://api.openai.com/v1',
+    xaiApiKey: '',
+    xaiBaseUrl: 'https://api.x.ai/v1',
+    xaiTextModel: 'grok-4.3',
+    xaiTranscriptionLanguage: 'en',
     textModel: 'gpt-5.2',
     transcriptionModel: 'gpt-4o-mini-transcribe',
     voiceShortcut: 'CommandOrControl+Shift+Space'
@@ -121,7 +125,8 @@ function saveSettings(nextSettings) {
 function publicSettings(settings = loadSettings()) {
   return {
     ...settings,
-    openaiApiKey: settings.openaiApiKey ? '********' : ''
+    openaiApiKey: settings.openaiApiKey ? '********' : '',
+    xaiApiKey: settings.xaiApiKey ? '********' : ''
   };
 }
 
@@ -144,17 +149,24 @@ function settingsWithSecret(settingsPatch = {}) {
   const current = loadSettings();
   const next = { ...current, ...settingsPatch };
   if (settingsPatch.openaiApiKey === '********') next.openaiApiKey = current.openaiApiKey || '';
+  if (settingsPatch.xaiApiKey === '********') next.xaiApiKey = current.xaiApiKey || '';
   return next;
 }
 
-async function openaiFetch(pathname, body, extra = {}) {
+async function providerFetch(provider, pathname, body, extra = {}) {
   const settings = loadSettings();
-  if (!settings.openaiApiKey) throw new Error('OpenAI API key is not configured.');
-  const baseUrl = (settings.openaiBaseUrl || defaultSettings().openaiBaseUrl).replace(/\/+$/, '');
+  var apiKey = settings.openaiApiKey;
+  var baseUrl = settings.openaiBaseUrl || defaultSettings().openaiBaseUrl;
+  if (provider === 'xai') {
+    apiKey = settings.xaiApiKey;
+    baseUrl = settings.xaiBaseUrl || defaultSettings().xaiBaseUrl;
+  }
+  if (!apiKey) throw new Error((provider === 'xai' ? 'Grok/xAI' : 'OpenAI') + ' API key is not configured.');
+  baseUrl = baseUrl.replace(/\/+$/, '');
   const response = await fetch(`${baseUrl}${pathname}`, {
     method: 'POST',
     headers: {
-      Authorization: `Bearer ${settings.openaiApiKey}`,
+      Authorization: `Bearer ${apiKey}`,
       ...(extra.headers || {})
     },
     body
@@ -164,6 +176,14 @@ async function openaiFetch(pathname, body, extra = {}) {
     throw new Error(`OpenAI request failed (${response.status}): ${detail.slice(0, 500)}`);
   }
   return response;
+}
+
+async function openaiFetch(pathname, body, extra = {}) {
+  return providerFetch('openai', pathname, body, extra);
+}
+
+async function xaiFetch(pathname, body, extra = {}) {
+  return providerFetch('xai', pathname, body, extra);
 }
 
 function extractOutputText(responseJson) {
@@ -623,10 +643,22 @@ ipcMain.handle('voice:transcribe', async (_event, payload = {}) => {
   if (!bytes.length) throw new Error('No audio was recorded.');
 
   const form = new FormData();
+  const file = new File([bytes], 'rubynotes-idea.webm', { type: payload.mimeType || 'audio/webm' });
+
+  if (settings.aiProvider === 'xai') {
+    form.append('format', 'true');
+    form.append('language', settings.xaiTranscriptionLanguage || defaultSettings().xaiTranscriptionLanguage);
+    form.append('keyterm', 'RubyNotes');
+    form.append('keyterm', 'mrld');
+    form.append('file', file);
+    const response = await xaiFetch('/stt', form);
+    const result = await response.json();
+    return { transcript: String(result.text || '').trim() };
+  }
+
   form.append('model', settings.transcriptionModel || defaultSettings().transcriptionModel);
   form.append('response_format', 'text');
-  form.append('file', new File([bytes], 'rubynotes-idea.webm', { type: payload.mimeType || 'audio/webm' }));
-
+  form.append('file', file);
   const response = await openaiFetch('/audio/transcriptions', form);
   return { transcript: (await response.text()).trim() };
 });
@@ -636,22 +668,33 @@ ipcMain.handle('voice:create-note', async (_event, payload = {}) => {
   const transcript = String(payload.transcript || '').trim();
   if (!transcript) throw new Error('Transcript is empty.');
 
-  const response = await openaiFetch('/responses', JSON.stringify({
-    model: settings.textModel || defaultSettings().textModel,
-    instructions: [
+  const instructions = [
       'You turn spoken ideas into clean RubyNotes .mrld notes.',
       'Return only JSON with keys "title" and "body".',
       'The body must be valid RubyNotes .mrld syntax, not Markdown.',
       'Use Title:, h2:, @ paragraphs, > tasks, ? questions, ! warnings, = key-value rows, Table:, Kanban:, and Code: blocks where useful.',
       'Do not include fenced Markdown code blocks.'
-    ].join('\n'),
-    input: [
+    ].join('\n');
+  const input = [
       'Convert this spoken idea into a concise, well-structured .mrld note.',
       '',
       'Spoken idea:',
       transcript
-    ].join('\n')
-  }), { headers: { 'Content-Type': 'application/json' } });
+    ].join('\n');
+  const body = {
+    model: settings.aiProvider === 'xai'
+      ? (settings.xaiTextModel || defaultSettings().xaiTextModel)
+      : (settings.textModel || defaultSettings().textModel),
+    input: [
+      { role: 'system', content: instructions },
+      { role: 'user', content: input }
+    ],
+    store: false
+  };
+
+  const response = await (settings.aiProvider === 'xai'
+    ? xaiFetch('/responses', JSON.stringify(body), { headers: { 'Content-Type': 'application/json' } })
+    : openaiFetch('/responses', JSON.stringify(body), { headers: { 'Content-Type': 'application/json' } }));
 
   const text = extractOutputText(await response.json());
   return parseGeneratedNote(text, transcript);

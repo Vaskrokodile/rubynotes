@@ -23,8 +23,12 @@ var settingsSaveBtn = document.getElementById('settings-save-btn');
 var aiProviderInput = document.getElementById('ai-provider');
 var openaiApiKeyInput = document.getElementById('openai-api-key');
 var openaiBaseUrlInput = document.getElementById('openai-base-url');
+var xaiApiKeyInput = document.getElementById('xai-api-key');
+var xaiBaseUrlInput = document.getElementById('xai-base-url');
 var textModelInput = document.getElementById('text-model');
 var transcriptionModelInput = document.getElementById('transcription-model');
+var xaiTextModelInput = document.getElementById('xai-text-model');
+var xaiTranscriptionLanguageInput = document.getElementById('xai-transcription-language');
 var voiceShortcutInput = document.getElementById('voice-shortcut');
 var voiceBtn = document.getElementById('voice-btn');
 var voiceTestBtn = document.getElementById('voice-test-btn');
@@ -386,8 +390,12 @@ function loadSettingsForm() {
     aiProviderInput.value = settings.aiProvider || 'openai';
     openaiApiKeyInput.value = settings.openaiApiKey || '';
     openaiBaseUrlInput.value = settings.openaiBaseUrl || 'https://api.openai.com/v1';
+    xaiApiKeyInput.value = settings.xaiApiKey || '';
+    xaiBaseUrlInput.value = settings.xaiBaseUrl || 'https://api.x.ai/v1';
     textModelInput.value = settings.textModel || 'gpt-5.2';
     transcriptionModelInput.value = settings.transcriptionModel || 'gpt-4o-mini-transcribe';
+    xaiTextModelInput.value = settings.xaiTextModel || 'grok-4.3';
+    xaiTranscriptionLanguageInput.value = settings.xaiTranscriptionLanguage || 'en';
     voiceShortcutInput.value = settings.voiceShortcut || 'CommandOrControl+Shift+Space';
   }).catch(function(err) { setVoiceStatus(err.message || 'Could not load settings'); });
 }
@@ -399,11 +407,16 @@ function saveSettingsForm() {
     aiProvider: aiProviderInput.value,
     openaiApiKey: openaiApiKeyInput.value,
     openaiBaseUrl: openaiBaseUrlInput.value,
+    xaiApiKey: xaiApiKeyInput.value,
+    xaiBaseUrl: xaiBaseUrlInput.value,
     textModel: textModelInput.value,
     transcriptionModel: transcriptionModelInput.value,
+    xaiTextModel: xaiTextModelInput.value,
+    xaiTranscriptionLanguage: xaiTranscriptionLanguageInput.value,
     voiceShortcut: voiceShortcutInput.value
   }).then(function(settings) {
     openaiApiKeyInput.value = settings.openaiApiKey || '';
+    xaiApiKeyInput.value = settings.xaiApiKey || '';
     setVoiceStatus('Settings saved');
   }).catch(function(err) { setVoiceStatus(err.message || 'Could not save settings'); });
 }
