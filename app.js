@@ -39,12 +39,20 @@ var importBtn = document.getElementById('import-btn');
 var exportBtn = document.getElementById('export-btn');
 var importFile = document.getElementById('import-file');
 var composingRaw = false;
+var renderCacheKey = null;
+var renderCacheHtml = '';
+var notesListTimer = null;
+var lastTerminalSync = '';
 
 function loadNotes() {
   var raw = localStorage.getItem(STORAGE_KEY);
   if (raw) { try { notes = JSON.parse(raw); } catch(e) { notes = []; } }
 }
 function saveNotes() { localStorage.setItem(STORAGE_KEY, JSON.stringify(notes)); }
+function scheduleNotesListRender() {
+  clearTimeout(notesListTimer);
+  notesListTimer = setTimeout(renderNotesList, 250);
+}
 
 function renderNotesList() {
   notes.sort(function(a,b) { return b.updatedAt - a.updatedAt; });
@@ -146,26 +154,47 @@ function terminalNoteContext(body, cliType) {
   };
 }
 
+function analyzeDirectives(source) {
+  var body = source || '';
+  var result = { body: body, isWhitepaper: false, cliType: null };
+
+  if (/^\/\/whitepaper/m.test(result.body)) {
+    result.isWhitepaper = true;
+    result.body = result.body.replace(/^\/\/whitepaper\s*\n?/gm, '');
+  }
+
+  if (/^\/\/terminal\s+opencode/m.test(result.body)) { result.cliType = 'opencode'; result.body = result.body.replace(/^\/\/terminal\s+opencode\s*\n?/gm, ''); }
+  else if (/^\/\/terminal\s+qwen/m.test(result.body)) { result.cliType = 'qwen'; result.body = result.body.replace(/^\/\/terminal\s+qwen\s*\n?/gm, ''); }
+  else if (/^\/\/terminal\s+codex/m.test(result.body)) { result.cliType = 'codex'; result.body = result.body.replace(/^\/\/terminal\s+codex\s*\n?/gm, ''); }
+  else if (/^\/\/terminal\s+agy/m.test(result.body)) { result.cliType = 'agy'; result.body = result.body.replace(/^\/\/terminal\s+agy\s*\n?/gm, ''); }
+  else if (/^\/\/terminal\s+kilo/m.test(result.body)) { result.cliType = 'kilo'; result.body = result.body.replace(/^\/\/terminal\s+kilo\s*\n?/gm, ''); }
+  else if (/^\/\/terminal/m.test(result.body)) { result.cliType = 'default'; result.body = result.body.replace(/^\/\/terminal\s*\n?/gm, ''); }
+
+  result.body = stripDuplicateBodyTitle(noteTitle.value, result.body);
+  return result;
+}
+
+function syncDirectivesFromSource(source) {
+  var analyzed = analyzeDirectives(source || '');
+  var key = analyzed.isWhitepaper + ':' + (analyzed.cliType || 'none');
+  editorContent.classList.toggle('whitepaper', analyzed.isWhitepaper);
+  editorContent.classList.toggle('terminal-mode', !!analyzed.cliType);
+  if (key === lastTerminalSync && (!analyzed.cliType || termActive)) {
+    if (analyzed.cliType) updateTerminalContext(analyzed.cliType);
+    return analyzed;
+  }
+  lastTerminalSync = key;
+  if (analyzed.cliType && activeId) openTerminal(analyzed.cliType);
+  else if (!analyzed.cliType) destroyTerminal();
+  return analyzed;
+}
+
 function updatePreview() {
   if (!activeId) return;
   var body = noteBody.value;
-  var isWhitepaper = false, cliType = null;
-  var note = notes.find(function(n) { return n.id === activeId; });
+  var analyzed = syncDirectivesFromSource(body);
 
-  if (/^\/\/whitepaper/m.test(body)) { isWhitepaper = true; body = body.replace(/^\/\/whitepaper\s*\n?/gm, ''); }
-  if (/^\/\/terminal\s+opencode/m.test(body)) { cliType = 'opencode'; body = body.replace(/^\/\/terminal\s+opencode\s*\n?/gm, ''); }
-  else if (/^\/\/terminal\s+qwen/m.test(body)) { cliType = 'qwen'; body = body.replace(/^\/\/terminal\s+qwen\s*\n?/gm, ''); }
-  else if (/^\/\/terminal\s+codex/m.test(body)) { cliType = 'codex'; body = body.replace(/^\/\/terminal\s+codex\s*\n?/gm, ''); }
-  else if (/^\/\/terminal\s+agy/m.test(body)) { cliType = 'agy'; body = body.replace(/^\/\/terminal\s+agy\s*\n?/gm, ''); }
-  else if (/^\/\/terminal\s+kilo/m.test(body)) { cliType = 'kilo'; body = body.replace(/^\/\/terminal\s+kilo\s*\n?/gm, ''); }
-  else if (/^\/\/terminal/m.test(body)) { cliType = 'default'; body = body.replace(/^\/\/terminal\s*\n?/gm, ''); }
-
-  body = stripDuplicateBodyTitle(noteTitle.value, body);
-
-  editorContent.classList.toggle('whitepaper', isWhitepaper);
-  editorContent.classList.toggle('terminal-mode', !!cliType);
-
-  if (cliType) {
+  if (analyzed.cliType) {
     composingRaw = false;
     livePreview.setAttribute('contenteditable', 'true');
     livePreview.innerHTML = '';
@@ -173,14 +202,13 @@ function updatePreview() {
     try {
       setEmeraldNotes(notes);
       livePreview.setAttribute('contenteditable', 'true');
-      livePreview.innerHTML = parseEmerald(body);
+      var cacheKey = activeId + ':' + noteTitle.value + ':' + analyzed.body + ':' + notes.length;
+      if (cacheKey !== renderCacheKey) {
+        renderCacheHtml = parseEmerald(analyzed.body);
+        renderCacheKey = cacheKey;
+      }
+      livePreview.innerHTML = renderCacheHtml;
     } catch(e) { livePreview.innerHTML = '<p style="color:var(--red)">Preview error</p>'; }
-  }
-
-  if (cliType && activeId) {
-    openTerminal(cliType);
-  } else if (!cliType) {
-    destroyTerminal();
   }
 }
 
@@ -189,7 +217,7 @@ function autoSave() {
   var note = notes.find(function(n) { return n.id === activeId; });
   if (!note) return;
   note.title = noteTitle.value; note.body = noteBody.value; note.updatedAt = Date.now();
-  saveNotes(); saveStatus.textContent = 'Saved ' + new Date().toLocaleTimeString(); renderNotesList();
+  saveNotes(); saveStatus.textContent = 'Saved ' + new Date().toLocaleTimeString(); scheduleNotesListRender();
 }
 
 var SELF_RENDER_CSS = "body{background:#0c0c0c;color:#bbb;font-family:'IBM Plex Mono','Fira Code','SF Mono','Consolas',monospace;font-size:13px;line-height:1.75;padding:40px 48px;max-width:780px;margin:0 auto}h1{font-size:20px;color:#eee;border-bottom:1px solid #2a2a2a;padding-bottom:8px}h1::before{content:'# ';color:#3f3}h2{font-size:16px;color:#eee;margin-top:24px}h2::before{content:'## ';color:#3f3;opacity:.6}h3{font-size:14px;color:#bbb}h3::before{content:'### ';color:#3f3;opacity:.4}p{margin:6px 0;color:#bbb}strong{color:#eee;font-weight:700}em{font-style:italic}code{background:#111;color:#3f3;padding:1px 5px;font-size:.92em}pre{background:#080808;border:1px solid #2a2a2a;padding:14px 16px;overflow-x:auto;white-space:pre-wrap}ul{list-style:none;padding:0;margin:6px 0}li{padding:4px 0 4px 16px;position:relative;color:#bbb}li::before{content:'-';position:absolute;left:0;color:#666}";
@@ -340,17 +368,38 @@ function openTerminal(type) {
 }
 function showRawEditor() {
   if (composingRaw || currentView !== 'editor' || !activeId) return;
+  enterRawEditor();
+  placeCaretAtEnd(livePreview);
+}
+function enterRawEditor() {
+  if (composingRaw || currentView !== 'editor' || !activeId) return;
   composingRaw = true;
   editorContent.classList.remove('terminal-mode');
   livePreview.setAttribute('contenteditable', 'true');
   livePreview.innerText = noteBody.value;
-  placeCaretAtEnd(livePreview);
 }
 function placeCaretAtEnd(el) {
   var range = document.createRange();
   var sel = window.getSelection();
   range.selectNodeContents(el);
   range.collapse(false);
+  sel.removeAllRanges();
+  sel.addRange(range);
+}
+function placeCaretFromPoint(x, y) {
+  var range = null;
+  if (document.caretRangeFromPoint) {
+    range = document.caretRangeFromPoint(x, y);
+  } else if (document.caretPositionFromPoint) {
+    var pos = document.caretPositionFromPoint(x, y);
+    if (pos) {
+      range = document.createRange();
+      range.setStart(pos.offsetNode, pos.offset);
+    }
+  }
+  if (!range) return placeCaretAtEnd(livePreview);
+  var sel = window.getSelection();
+  range.collapse(true);
   sel.removeAllRanges();
   sel.addRange(range);
 }
@@ -651,7 +700,18 @@ livePreview.addEventListener('input', function() {
   if (!composingRaw) composingRaw = true;
   noteBody.value = livePreview.innerText.replace(/\u00a0/g, ' ');
   clearTimeout(saveTimer); saveStatus.textContent = 'Saving...';
-  saveTimer = setTimeout(function() { autoSave(); updatePreview(); composingRaw = false; }, 1000);
+  saveTimer = setTimeout(function() {
+    autoSave();
+    syncDirectivesFromSource(noteBody.value);
+  }, 350);
+});
+livePreview.addEventListener('mousedown', function(e) {
+  if (e.target && e.target.classList && e.target.classList.contains('em-checkbox')) return;
+  if (composingRaw || currentView !== 'editor' || !activeId) return;
+  e.preventDefault();
+  enterRawEditor();
+  livePreview.focus();
+  setTimeout(function() { placeCaretFromPoint(e.clientX, e.clientY); }, 0);
 });
 livePreview.addEventListener('focus', showRawEditor);
 livePreview.addEventListener('blur', function() {
