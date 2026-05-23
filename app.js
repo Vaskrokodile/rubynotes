@@ -180,6 +180,7 @@ function updatePreview() {
   if (!activeId) return;
   previewTitle.textContent = noteTitle.value || 'Untitled';
   try {
+    setEmeraldNotes(notes);
     previewBody.innerHTML = parseEmerald(noteBody.value);
   } catch (e) {
     previewBody.innerHTML = '<p style="color:#e44">Preview error</p>';
