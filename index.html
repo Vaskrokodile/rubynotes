@@ -16,6 +16,7 @@
       </div>
       <div id="notes-list" class="notes-list"></div>
       <div class="sidebar-footer">
+        <button id="settings-btn" class="btn-docs">Settings</button>
         <button id="docs-btn" class="btn-docs">Emerald Syntax Guide</button>
       </div>
     </aside>
@@ -32,6 +33,7 @@
           <div class="footer-left">
             <button id="import-btn" class="btn-io">Import .mrld</button>
             <button id="export-btn" class="btn-io">Export .mrld</button>
+            <button id="voice-btn" class="btn-io">Voice Idea</button>
             <input type="file" id="import-file" accept=".mrld" style="display:none">
           </div>
           <div class="footer-right">
@@ -117,6 +119,16 @@
   </tbody>
 </table>
 
+<h2>Voice Notes</h2>
+<table class="docs-table">
+  <thead><tr><th>Setting</th><th>Effect</th></tr></thead>
+  <tbody>
+    <tr><td><code>OpenAI API key</code></td><td>Enables voice transcription and idea cleanup</td></tr>
+    <tr><td><code>Voice Idea</code></td><td>Records your idea, transcribes it, and creates a clean <code>.mrld</code> note</td></tr>
+    <tr><td><code>Shortcut</code></td><td>Starts or stops voice capture from anywhere in RubyNotes</td></tr>
+  </tbody>
+</table>
+
 <h2>Full Example</h2>
 <pre>//terminal opencode
 # App Spec
@@ -132,6 +144,50 @@ Table: Tech Stack
 | Backend   | Node.js      |
 | Database  | PostgreSQL   |</pre>
 
+        </div>
+      </div>
+      <div id="settings-content" class="settings-content hidden">
+        <div class="settings-wrapper">
+          <div class="settings-head">
+            <h1>Settings</h1>
+            <button id="settings-save-btn" class="btn-new settings-save">Save</button>
+          </div>
+          <div class="settings-section">
+            <h2>AI Provider</h2>
+            <label class="settings-field">
+              <span>Provider</span>
+              <select id="ai-provider">
+                <option value="openai">OpenAI</option>
+              </select>
+            </label>
+            <label class="settings-field">
+              <span>API Key</span>
+              <input id="openai-api-key" type="password" placeholder="sk-...">
+            </label>
+            <label class="settings-field">
+              <span>Base URL</span>
+              <input id="openai-base-url" type="text" placeholder="https://api.openai.com/v1">
+            </label>
+          </div>
+          <div class="settings-section">
+            <h2>Voice Notes</h2>
+            <label class="settings-field">
+              <span>Conversation Model</span>
+              <input id="text-model" type="text" placeholder="gpt-5.2">
+            </label>
+            <label class="settings-field">
+              <span>Transcription Model</span>
+              <input id="transcription-model" type="text" placeholder="gpt-4o-mini-transcribe">
+            </label>
+            <label class="settings-field">
+              <span>Shortcut</span>
+              <input id="voice-shortcut" type="text" placeholder="CommandOrControl+Shift+Space">
+            </label>
+            <div class="settings-actions">
+              <button id="voice-test-btn" class="btn-new">Voice Idea</button>
+              <span id="voice-status" class="settings-status"></span>
+            </div>
+          </div>
         </div>
       </div>
     </main>

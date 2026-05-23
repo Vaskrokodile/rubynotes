@@ -31,3 +31,23 @@ contextBridge.exposeInMainWorld('rubyNotesTerminal', {
     return () => ipcRenderer.removeListener('terminal:exit', listener);
   }
 });
+
+contextBridge.exposeInMainWorld('rubyNotesSettings', {
+  get() {
+    return ipcRenderer.invoke('settings:get');
+  },
+  save(settings) {
+    return ipcRenderer.invoke('settings:save', settings);
+  },
+  transcribe(audio, mimeType) {
+    return ipcRenderer.invoke('voice:transcribe', { audio, mimeType });
+  },
+  createNote(transcript) {
+    return ipcRenderer.invoke('voice:create-note', { transcript });
+  },
+  onVoiceShortcut(callback) {
+    const listener = () => callback();
+    ipcRenderer.on('voice:shortcut', listener);
+    return () => ipcRenderer.removeListener('voice:shortcut', listener);
+  }
+});

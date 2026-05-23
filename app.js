@@ -17,6 +17,18 @@ var cliContainer = document.getElementById('cli-container');
 var newNoteBtn = document.getElementById('new-note-btn');
 var deleteNoteBtn = document.getElementById('delete-note-btn');
 var docsBtn = document.getElementById('docs-btn');
+var settingsBtn = document.getElementById('settings-btn');
+var settingsContent = document.getElementById('settings-content');
+var settingsSaveBtn = document.getElementById('settings-save-btn');
+var aiProviderInput = document.getElementById('ai-provider');
+var openaiApiKeyInput = document.getElementById('openai-api-key');
+var openaiBaseUrlInput = document.getElementById('openai-base-url');
+var textModelInput = document.getElementById('text-model');
+var transcriptionModelInput = document.getElementById('transcription-model');
+var voiceShortcutInput = document.getElementById('voice-shortcut');
+var voiceBtn = document.getElementById('voice-btn');
+var voiceTestBtn = document.getElementById('voice-test-btn');
+var voiceStatus = document.getElementById('voice-status');
 var importBtn = document.getElementById('import-btn');
 var exportBtn = document.getElementById('export-btn');
 var importFile = document.getElementById('import-file');
@@ -59,6 +71,13 @@ function createNote() {
   noteTitle.value = ''; noteBody.value = ''; updatePreview();
   showEditorView(); renderNotesList(); updateDocsBtn(); noteBody.focus();
 }
+function createNoteFromAi(title, body) {
+  var now = Date.now();
+  notes.push({ id: now.toString(), title: title || 'Voice idea', body: body || '', createdAt: now, updatedAt: now });
+  saveNotes(); currentView = 'editor'; activeId = notes[notes.length-1].id;
+  noteTitle.value = notes[notes.length-1].title; noteBody.value = notes[notes.length-1].body; updatePreview();
+  showEditorView(); renderNotesList(); updateDocsBtn(); noteBody.focus();
+}
 
 function deleteNote() {
   if (!activeId || currentView !== 'editor') return;
@@ -68,15 +87,23 @@ function deleteNote() {
 }
 
 function showEditorView() {
-  currentView = 'editor'; docsContent.classList.add('hidden');
+  currentView = 'editor'; docsContent.classList.add('hidden'); settingsContent.classList.add('hidden');
   editorContent.classList.remove('hidden'); editorEmpty.classList.add('hidden'); updateDocsBtn();
 }
 function showDocsView() {
   currentView = 'docs'; activeId = null; destroyTerminal();
   editorContent.classList.add('hidden'); editorEmpty.classList.add('hidden');
-  docsContent.classList.remove('hidden'); updateDocsBtn(); renderNotesList();
+  settingsContent.classList.add('hidden'); docsContent.classList.remove('hidden'); updateDocsBtn(); renderNotesList();
 }
-function updateDocsBtn() { docsBtn.classList.toggle('active', currentView === 'docs'); }
+function showSettingsView() {
+  currentView = 'settings'; activeId = null; destroyTerminal();
+  editorContent.classList.add('hidden'); editorEmpty.classList.add('hidden'); docsContent.classList.add('hidden');
+  settingsContent.classList.remove('hidden'); updateDocsBtn(); renderNotesList(); loadSettingsForm();
+}
+function updateDocsBtn() {
+  docsBtn.classList.toggle('active', currentView === 'docs');
+  settingsBtn.classList.toggle('active', currentView === 'settings');
+}
 function terminalNoteContext(body, cliType) {
   var note = notes.find(function(n) { return n.id === activeId; });
   var cleanedBody = body
@@ -342,6 +369,101 @@ function connectElectronTerminal(type) {
   });
 }
 
+/* ===================== SETTINGS + VOICE NOTES ===================== */
+
+var mediaRecorder = null;
+var audioChunks = [];
+var recording = false;
+
+function setVoiceStatus(text) {
+  if (voiceStatus) voiceStatus.textContent = text || '';
+  saveStatus.textContent = text || saveStatus.textContent;
+}
+
+function loadSettingsForm() {
+  if (!window.rubyNotesSettings) return;
+  window.rubyNotesSettings.get().then(function(settings) {
+    aiProviderInput.value = settings.aiProvider || 'openai';
+    openaiApiKeyInput.value = settings.openaiApiKey || '';
+    openaiBaseUrlInput.value = settings.openaiBaseUrl || 'https://api.openai.com/v1';
+    textModelInput.value = settings.textModel || 'gpt-5.2';
+    transcriptionModelInput.value = settings.transcriptionModel || 'gpt-4o-mini-transcribe';
+    voiceShortcutInput.value = settings.voiceShortcut || 'CommandOrControl+Shift+Space';
+  }).catch(function(err) { setVoiceStatus(err.message || 'Could not load settings'); });
+}
+
+function saveSettingsForm() {
+  if (!window.rubyNotesSettings) return;
+  setVoiceStatus('Saving settings...');
+  window.rubyNotesSettings.save({
+    aiProvider: aiProviderInput.value,
+    openaiApiKey: openaiApiKeyInput.value,
+    openaiBaseUrl: openaiBaseUrlInput.value,
+    textModel: textModelInput.value,
+    transcriptionModel: transcriptionModelInput.value,
+    voiceShortcut: voiceShortcutInput.value
+  }).then(function(settings) {
+    openaiApiKeyInput.value = settings.openaiApiKey || '';
+    setVoiceStatus('Settings saved');
+  }).catch(function(err) { setVoiceStatus(err.message || 'Could not save settings'); });
+}
+
+function captureShortcut(e) {
+  var parts = [];
+  if (e.ctrlKey || e.metaKey) parts.push('CommandOrControl');
+  if (e.altKey) parts.push('Alt');
+  if (e.shiftKey) parts.push('Shift');
+  var key = e.key.length === 1 ? e.key.toUpperCase() : e.key;
+  if (['Control','Shift','Alt','Meta'].indexOf(key) === -1) parts.push(key === ' ' ? 'Space' : key);
+  if (parts.length) voiceShortcutInput.value = parts.join('+');
+}
+
+function startVoiceCapture() {
+  if (recording) return stopVoiceCapture();
+  if (!window.rubyNotesSettings || !navigator.mediaDevices) {
+    setVoiceStatus('Voice capture is unavailable');
+    return;
+  }
+  setVoiceStatus('Listening...');
+  navigator.mediaDevices.getUserMedia({ audio: true }).then(function(stream) {
+    audioChunks = [];
+    mediaRecorder = new MediaRecorder(stream);
+    recording = true;
+    [voiceBtn, voiceTestBtn].forEach(function(btn) { if (btn) btn.classList.add('active'); });
+    mediaRecorder.ondataavailable = function(e) { if (e.data && e.data.size) audioChunks.push(e.data); };
+    mediaRecorder.onstop = function() {
+      stream.getTracks().forEach(function(track) { track.stop(); });
+      finishVoiceCapture(mediaRecorder.mimeType || 'audio/webm');
+    };
+    mediaRecorder.start();
+  }).catch(function(err) { setVoiceStatus(err.message || 'Microphone permission denied'); });
+}
+
+function stopVoiceCapture() {
+  if (mediaRecorder && recording) {
+    setVoiceStatus('Processing voice idea...');
+    recording = false;
+    [voiceBtn, voiceTestBtn].forEach(function(btn) { if (btn) btn.classList.remove('active'); });
+    mediaRecorder.stop();
+  }
+}
+
+function finishVoiceCapture(mimeType) {
+  var blob = new Blob(audioChunks, { type: mimeType });
+  blob.arrayBuffer().then(function(buffer) {
+    setVoiceStatus('Transcribing...');
+    return window.rubyNotesSettings.transcribe(buffer, mimeType);
+  }).then(function(result) {
+    setVoiceStatus('Writing .mrld note...');
+    return window.rubyNotesSettings.createNote(result.transcript);
+  }).then(function(note) {
+    createNoteFromAi(note.title, note.body);
+    setVoiceStatus('Voice note created');
+  }).catch(function(err) {
+    setVoiceStatus(err.message || 'Voice note failed');
+  });
+}
+
 function resizeTerminalSession() {
   if (!termInstance || !termSessionId || !window.rubyNotesTerminal) return;
   try {
@@ -431,9 +553,17 @@ noteBody.addEventListener('input', function() {
 newNoteBtn.addEventListener('click', createNote);
 deleteNoteBtn.addEventListener('click', deleteNote);
 docsBtn.addEventListener('click', showDocsView);
+settingsBtn.addEventListener('click', showSettingsView);
 exportBtn.addEventListener('click', exportNote);
 importBtn.addEventListener('click', triggerImport);
 importFile.addEventListener('change', handleFileSelect);
+settingsSaveBtn.addEventListener('click', saveSettingsForm);
+voiceShortcutInput.addEventListener('keydown', function(e) { e.preventDefault(); captureShortcut(e); });
+voiceBtn.addEventListener('click', startVoiceCapture);
+voiceTestBtn.addEventListener('click', startVoiceCapture);
+if (window.rubyNotesSettings) {
+  window.rubyNotesSettings.onVoiceShortcut(startVoiceCapture);
+}
 
 function esc(str) { return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 function formatDate(ts) {

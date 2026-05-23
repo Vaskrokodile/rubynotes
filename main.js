@@ -1,11 +1,13 @@
 const path = require('path');
 const fs = require('fs');
 const { spawnSync } = require('child_process');
-const { app, BrowserWindow, ipcMain } = require('electron');
+const { app, BrowserWindow, ipcMain, globalShortcut, session } = require('electron');
 const pty = require('@homebridge/node-pty-prebuilt-multiarch');
 
 const terminals = new Map();
 const isWindows = process.platform === 'win32';
+let mainWindow = null;
+let appSettings = null;
 
 const CLI_DEFS = {
   default: {
@@ -76,7 +78,121 @@ function createWindow() {
     }
   });
 
+  mainWindow = win;
   win.loadFile(path.join(__dirname, 'index.html'));
+  win.on('closed', () => {
+    if (mainWindow === win) mainWindow = null;
+  });
+}
+
+function settingsPath() {
+  return path.join(app.getPath('userData'), 'settings.json');
+}
+
+function defaultSettings() {
+  return {
+    aiProvider: 'openai',
+    openaiApiKey: '',
+    openaiBaseUrl: 'https://api.openai.com/v1',
+    textModel: 'gpt-5.2',
+    transcriptionModel: 'gpt-4o-mini-transcribe',
+    voiceShortcut: 'CommandOrControl+Shift+Space'
+  };
+}
+
+function loadSettings() {
+  if (appSettings) return appSettings;
+  try {
+    appSettings = { ...defaultSettings(), ...JSON.parse(fs.readFileSync(settingsPath(), 'utf8')) };
+  } catch {
+    appSettings = defaultSettings();
+  }
+  return appSettings;
+}
+
+function saveSettings(nextSettings) {
+  appSettings = { ...defaultSettings(), ...nextSettings };
+  fs.mkdirSync(path.dirname(settingsPath()), { recursive: true });
+  fs.writeFileSync(settingsPath(), JSON.stringify(appSettings, null, 2), 'utf8');
+  registerVoiceShortcut();
+  return appSettings;
+}
+
+function publicSettings(settings = loadSettings()) {
+  return {
+    ...settings,
+    openaiApiKey: settings.openaiApiKey ? '********' : ''
+  };
+}
+
+function registerVoiceShortcut() {
+  globalShortcut.unregisterAll();
+  const settings = loadSettings();
+  if (!settings.voiceShortcut) return;
+  try {
+    globalShortcut.register(settings.voiceShortcut, () => {
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('voice:shortcut');
+      }
+    });
+  } catch {
+    // Invalid shortcuts are ignored until the user saves a valid one.
+  }
+}
+
+function settingsWithSecret(settingsPatch = {}) {
+  const current = loadSettings();
+  const next = { ...current, ...settingsPatch };
+  if (settingsPatch.openaiApiKey === '********') next.openaiApiKey = current.openaiApiKey || '';
+  return next;
+}
+
+async function openaiFetch(pathname, body, extra = {}) {
+  const settings = loadSettings();
+  if (!settings.openaiApiKey) throw new Error('OpenAI API key is not configured.');
+  const baseUrl = (settings.openaiBaseUrl || defaultSettings().openaiBaseUrl).replace(/\/+$/, '');
+  const response = await fetch(`${baseUrl}${pathname}`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${settings.openaiApiKey}`,
+      ...(extra.headers || {})
+    },
+    body
+  });
+  if (!response.ok) {
+    const detail = await response.text();
+    throw new Error(`OpenAI request failed (${response.status}): ${detail.slice(0, 500)}`);
+  }
+  return response;
+}
+
+function extractOutputText(responseJson) {
+  if (responseJson.output_text) return responseJson.output_text;
+  const parts = [];
+  for (const item of responseJson.output || []) {
+    for (const content of item.content || []) {
+      if (content.type === 'output_text' && content.text) parts.push(content.text);
+      if (content.text && typeof content.text === 'string') parts.push(content.text);
+    }
+  }
+  return parts.join('\n').trim();
+}
+
+function parseGeneratedNote(text, transcript) {
+  const trimmed = String(text || '').trim();
+  try {
+    const cleaned = trimmed.replace(/^```(?:json)?/i, '').replace(/```$/i, '').trim();
+    const parsed = JSON.parse(cleaned);
+    return {
+      title: String(parsed.title || 'Voice idea').trim(),
+      body: String(parsed.body || parsed.mrld || '').trim()
+    };
+  } catch {
+    return {
+      title: 'Voice idea',
+      body: trimmed || `Title: Voice Idea\n\nh2: Raw Idea\n@ ${transcript}`
+    };
+  }
 }
 
 function getShell() {
@@ -497,11 +613,63 @@ ipcMain.on('terminal:dispose', (_event, payload) => {
   }
 });
 
-app.whenReady().then(createWindow);
+ipcMain.handle('settings:get', () => publicSettings());
+
+ipcMain.handle('settings:save', (_event, payload) => publicSettings(saveSettings(settingsWithSecret(payload || {}))));
+
+ipcMain.handle('voice:transcribe', async (_event, payload = {}) => {
+  const settings = loadSettings();
+  const bytes = Buffer.from(payload.audio || []);
+  if (!bytes.length) throw new Error('No audio was recorded.');
+
+  const form = new FormData();
+  form.append('model', settings.transcriptionModel || defaultSettings().transcriptionModel);
+  form.append('response_format', 'text');
+  form.append('file', new File([bytes], 'rubynotes-idea.webm', { type: payload.mimeType || 'audio/webm' }));
+
+  const response = await openaiFetch('/audio/transcriptions', form);
+  return { transcript: (await response.text()).trim() };
+});
+
+ipcMain.handle('voice:create-note', async (_event, payload = {}) => {
+  const settings = loadSettings();
+  const transcript = String(payload.transcript || '').trim();
+  if (!transcript) throw new Error('Transcript is empty.');
+
+  const response = await openaiFetch('/responses', JSON.stringify({
+    model: settings.textModel || defaultSettings().textModel,
+    instructions: [
+      'You turn spoken ideas into clean RubyNotes .mrld notes.',
+      'Return only JSON with keys "title" and "body".',
+      'The body must be valid RubyNotes .mrld syntax, not Markdown.',
+      'Use Title:, h2:, @ paragraphs, > tasks, ? questions, ! warnings, = key-value rows, Table:, Kanban:, and Code: blocks where useful.',
+      'Do not include fenced Markdown code blocks.'
+    ].join('\n'),
+    input: [
+      'Convert this spoken idea into a concise, well-structured .mrld note.',
+      '',
+      'Spoken idea:',
+      transcript
+    ].join('\n')
+  }), { headers: { 'Content-Type': 'application/json' } });
+
+  const text = extractOutputText(await response.json());
+  return parseGeneratedNote(text, transcript);
+});
+
+app.whenReady().then(() => {
+  loadSettings();
+  registerVoiceShortcut();
+  session.defaultSession.setPermissionRequestHandler((_webContents, permission, callback) => {
+    callback(permission === 'media');
+  });
+  createWindow();
+});
 
 app.on('window-all-closed', () => {
   for (const session of terminals.values()) session.term.kill();
   terminals.clear();
+  globalShortcut.unregisterAll();
   if (process.platform !== 'darwin') app.quit();
 });
 
