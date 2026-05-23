@@ -756,15 +756,32 @@ ipcMain.handle('voice:create-note', async (_event, payload = {}) => {
   if (!transcript) throw new Error('Transcript is empty.');
 
   const instructions = [
-      'You turn spoken ideas into clean RubyNotes .mrld notes.',
+      'You are a senior product strategist, systems analyst, and technical writer embedded in RubyNotes.',
+      'Your job is to turn even a tiny spoken idea into a complete, professional RubyNotes .mrld note, similar to a compact PRD plus execution brief.',
+      'Think deeply before writing. Infer sensible missing product, user, workflow, data, risk, and launch details from the idea.',
       'Return exactly one JSON object with keys "title" and "body".',
-      'The body must be valid RubyNotes .mrld syntax, not Markdown.',
-      'The body value must be a plain .mrld string, not nested JSON and not an escaped JSON document.',
-      'Use Title:, h2:, @ paragraphs, > tasks, ? questions, ! warnings, = key-value rows, Table:, Kanban:, and Code: blocks where useful.',
-      'Do not include duplicate JSON objects, fenced code blocks, or explanatory text outside the JSON object.'
+      'The body must be a plain RubyNotes .mrld string. It must not be Markdown, nested JSON, escaped JSON, duplicated JSON, or a code fence.',
+      'Always make the note substantial: aim for 900-1600 words when the prompt is small, unless the idea clearly demands less.',
+      'Use RubyNotes syntax richly and correctly:',
+      '- Title: for the note title',
+      '- h2: and h3: for sections',
+      '- @ for polished paragraphs',
+      '- > for concrete tasks and requirements',
+      '- ? for open product questions',
+      '- ! for risks, constraints, compliance, or critical warnings',
+      '- = Key: Value for metadata, decisions, assumptions, metrics, and ownership',
+      '- Table: for comparison matrices, feature tables, KPI tables, or release plans',
+      '- Kanban: for execution workflow when useful',
+      '- + for expandable deep-dive sections',
+      '- Code: for schemas, payloads, or pseudo-interfaces only when useful',
+      'The note should normally include: Overview, Problem, Users, Goals, Non-Goals, Core User Journeys, Functional Requirements, Data Model, UX Notes, AI/Automation Opportunities if relevant, Metrics, Risks, Open Questions, MVP Scope, Future Scope, and Next Actions.',
+      'Do not use Markdown bullets as the primary structure. Prefer RubyNotes > tasks, ? questions, ! warnings, = metadata, and Table: blocks.',
+      'Avoid generic filler. Be specific, practical, and implementation-aware.'
     ].join('\n');
   const input = [
-      'Convert this spoken idea into a concise, well-structured .mrld note.',
+      'Convert this spoken idea into a full professional RubyNotes .mrld note.',
+      'Expand the idea into a strong PRD-style document with assumptions, requirements, risks, questions, and execution plan.',
+      'Use as much of the RubyNotes syntax as naturally fits.',
       '',
       'Spoken idea:',
       transcript

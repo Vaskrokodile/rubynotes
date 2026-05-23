@@ -86,7 +86,6 @@ body {
 }
 .live-preview:empty { display:none; }
 .editor-content.terminal-mode .live-preview { display:none; }
-.editor-content.source-only .live-preview { display:none; }
 
 /* ---- CLI container (xterm terminals) ---- */
 #cli-container { flex-shrink:0; }

@@ -79,7 +79,7 @@ function createNote() {
 }
 function createNoteFromAi(title, body) {
   var now = Date.now();
-  notes.push({ id: now.toString(), title: title || 'Voice idea', body: body || '', createdAt: now, updatedAt: now, source: 'voice-ai' });
+  notes.push({ id: now.toString(), title: title || 'Voice idea', body: body || '', createdAt: now, updatedAt: now });
   saveNotes(); currentView = 'editor'; activeId = notes[notes.length-1].id;
   noteTitle.value = notes[notes.length-1].title; noteBody.value = notes[notes.length-1].body; updatePreview();
   showEditorView(); renderNotesList(); updateDocsBtn(); noteBody.focus();
@@ -151,9 +151,8 @@ function updatePreview() {
 
   editorContent.classList.toggle('whitepaper', isWhitepaper);
   editorContent.classList.toggle('terminal-mode', !!cliType);
-  editorContent.classList.toggle('source-only', !!(note && note.source === 'voice-ai'));
 
-  if (cliType || (note && note.source === 'voice-ai')) {
+  if (cliType) {
     livePreview.innerHTML = '';
   } else {
     try {
