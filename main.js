@@ -223,13 +223,34 @@ function parseGeneratedNote(text, transcript) {
 
 function extractLooseGeneratedNote(text) {
   const firstObject = extractFirstJsonObject(text) || text;
-  const titleMatch = firstObject.match(/"title"\s*:\s*"([^"]+)"/);
-  const bodyMatch = firstObject.match(/"body"\s*:\s*"([\s\S]*?)"\s*}/);
-  if (!bodyMatch) return null;
-  return {
-    title: titleMatch ? titleMatch[1] : 'Voice idea',
-    body: unescapeJsonishString(bodyMatch[1])
-  };
+  const keyMatch = firstObject.match(/"(?:body|mrld)"\s*:\s*"/);
+  if (!keyMatch) return null;
+  const start = keyMatch.index + keyMatch[0].length;
+  let result = '';
+  let i = start;
+  let escaped = false;
+  while (i < firstObject.length) {
+    const ch = firstObject[i];
+    if (escaped) {
+      if (ch === 'n') result += '\n';
+      else if (ch === 'r') result += '\r';
+      else if (ch === 't') result += '\t';
+      else result += ch;
+      escaped = false;
+      i++;
+      continue;
+    }
+    if (ch === '\\') { escaped = true; i++; continue; }
+    if (ch === '"') break;
+    result += ch;
+    i++;
+  }
+  const titleMatch = firstObject.match(/"title"\s*:\s*"((?:\\.|[^"\\])*)"/);
+  let title = 'Voice idea';
+  if (titleMatch) {
+    title = titleMatch[1].replace(/\\n/g, '\n').replace(/\\r/g, '\r').replace(/\\"/g, '"').replace(/\\\\/g, '\\');
+  }
+  return { title: title.trim() || 'Voice idea', body: result };
 }
 
 function unescapeJsonishString(value) {
@@ -679,7 +700,9 @@ ipcMain.handle('terminal:create', (event, options = {}) => {
       ...workspace.env,
       TERM: 'xterm-256color',
       RUBYNOTES_TERMINAL: type
-    }
+    },
+    windowsHide: true,
+    useConpty: true
   });
 
   terminals.set(id, { term, workspace, type });

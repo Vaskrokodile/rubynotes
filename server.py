@@ -1,9 +1,18 @@
 #!/usr/bin/env python3
 """RubyNotes server — serves static files + real PTY terminals via WebSocket."""
-import asyncio, json, os, pty, signal, struct, sys, threading
+import asyncio, json, os, signal, struct, sys, threading
 from http.server import HTTPServer, SimpleHTTPRequestHandler
 from socketserver import ThreadingMixIn
 import socket, hashlib, base64
+
+if sys.platform == "win32":
+    sys.stderr.write(
+        "RubyNotes server.py uses Unix pty and is not supported on Windows.\n"
+        "On Windows, use the Electron app directly (npm start) which uses node-pty.\n"
+    )
+    sys.exit(1)
+
+import pty  # noqa: E402  (Unix-only import)
 
 PORT = 8080
 WS_MAGIC = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"

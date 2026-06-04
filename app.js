@@ -45,7 +45,13 @@ var lastTerminalSync = '';
 
 function loadNotes() {
   var raw = localStorage.getItem(STORAGE_KEY);
-  if (raw) { try { notes = JSON.parse(raw); } catch(e) { notes = []; } }
+  if (raw) {
+    try {
+      var parsed = JSON.parse(raw);
+      notes = Array.isArray(parsed) ? parsed : [];
+    } catch(e) { notes = []; }
+  }
+  if (!Array.isArray(notes)) notes = [];
 }
 function saveNotes() { localStorage.setItem(STORAGE_KEY, JSON.stringify(notes)); }
 function scheduleNotesListRender() {
@@ -54,16 +60,18 @@ function scheduleNotesListRender() {
 }
 
 function renderNotesList() {
-  notes.sort(function(a,b) { return b.updatedAt - a.updatedAt; });
+  notes.sort(function(a,b) { return (b.updatedAt || 0) - (a.updatedAt || 0); });
   notesList.innerHTML = '';
   notes.forEach(function(note) {
+    if (!note || typeof note !== 'object') return;
     var el = document.createElement('div');
     el.className = 'note-item' + (note.id === activeId && currentView === 'editor' ? ' active' : '');
     var tr = document.createElement('div'); tr.className = 'note-item-title-row';
     var te = document.createElement('span'); te.className = 'note-item-title'; te.textContent = note.title || 'untitled';
     var ee = document.createElement('span'); ee.className = 'note-item-ext'; ee.textContent = '.mrld';
     tr.appendChild(te); tr.appendChild(ee);
-    var pe = document.createElement('div'); pe.className = 'note-item-preview'; pe.textContent = note.body.replace(/^\/\/\S+.*\n?/gm,'').slice(0,60) || 'No content';
+    var body = typeof note.body === 'string' ? note.body : '';
+    var pe = document.createElement('div'); pe.className = 'note-item-preview'; pe.textContent = body.replace(/^\/\/\S+.*\n?/gm,'').slice(0,60) || 'No content';
     var de = document.createElement('div'); de.className = 'note-item-date'; de.textContent = formatDate(note.updatedAt);
     el.appendChild(tr); el.appendChild(pe); el.appendChild(de);
     el.addEventListener('click', function() { selectNote(note.id); });
@@ -83,14 +91,14 @@ function createNote() {
   notes.push({ id: now.toString(), title: '', body: '', createdAt: now, updatedAt: now });
   saveNotes(); currentView = 'editor'; activeId = notes[notes.length-1].id;
   noteTitle.value = ''; noteBody.value = ''; updatePreview();
-  showEditorView(); renderNotesList(); updateDocsBtn(); livePreview.focus();
+  showEditorView(); renderNotesList(); updateDocsBtn(); noteBody.focus();
 }
 function createNoteFromAi(title, body) {
   var now = Date.now();
   notes.push({ id: now.toString(), title: title || 'Voice idea', body: stripDuplicateBodyTitle(title, body || ''), createdAt: now, updatedAt: now });
   saveNotes(); currentView = 'editor'; activeId = notes[notes.length-1].id;
   noteTitle.value = notes[notes.length-1].title; noteBody.value = notes[notes.length-1].body; updatePreview();
-  showEditorView(); renderNotesList(); updateDocsBtn(); livePreview.focus();
+  showEditorView(); renderNotesList(); updateDocsBtn(); noteBody.focus();
 }
 
 function deleteNote() {
@@ -194,12 +202,10 @@ function updatePreview() {
   var analyzed = syncDirectivesFromSource(body);
 
   if (analyzed.cliType) {
-    livePreview.setAttribute('contenteditable', 'true');
     livePreview.innerHTML = '';
   } else {
     try {
       setEmeraldNotes(notes);
-      livePreview.setAttribute('contenteditable', 'true');
       var cacheKey = activeId + ':' + noteTitle.value + ':' + analyzed.body + ':' + notes.length;
       if (cacheKey !== renderCacheKey) {
         renderCacheHtml = parseEmerald(analyzed.body);
@@ -208,6 +214,318 @@ function updatePreview() {
       livePreview.innerHTML = renderCacheHtml;
     } catch(e) { livePreview.innerHTML = '<p style="color:var(--red)">Preview error</p>'; }
   }
+}
+
+/* ===================== LIVE IN-PLACE TRANSFORM ===================== */
+
+var _transformLock = false;
+
+function getCaretTextNode() {
+  var sel = window.getSelection();
+  if (!sel || !sel.rangeCount) return null;
+  var range = sel.getRangeAt(0);
+  if (!livePreview.contains(range.commonAncestorContainer)) return null;
+  var node = range.endContainer;
+  if (node.nodeType === Node.TEXT_NODE) return { node: node, offset: range.endOffset };
+  if (node.nodeType === Node.ELEMENT_NODE) {
+    var t = node.lastChild;
+    while (t && t.nodeType !== Node.TEXT_NODE) t = t.lastChild;
+    if (t) return { node: t, offset: t.textContent.length };
+  }
+  return null;
+}
+
+function setCaretAfter(node) {
+  var range = document.createRange();
+  range.setStartAfter(node);
+  range.collapse(true);
+  var sel = window.getSelection();
+  sel.removeAllRanges();
+  sel.addRange(range);
+}
+
+function setCaretIn(node, offset) {
+  var range = document.createRange();
+  range.setStart(node, Math.min(offset, node.childNodes.length));
+  range.collapse(true);
+  var sel = window.getSelection();
+  sel.removeAllRanges();
+  sel.addRange(range);
+}
+
+function replaceTextRange(textNode, start, end, replacementNode) {
+  var fullText = textNode.textContent;
+  var before = fullText.substring(0, start);
+  var after = fullText.substring(end);
+  var parent = textNode.parentNode;
+  var beforeNode = before ? document.createTextNode(before) : null;
+  var afterNode = after ? document.createTextNode(after) : null;
+  if (beforeNode) parent.insertBefore(beforeNode, textNode);
+  parent.insertBefore(replacementNode, textNode);
+  if (afterNode) parent.insertBefore(afterNode, textNode);
+  parent.removeChild(textNode);
+  return { beforeNode: beforeNode, replacementNode: replacementNode, afterNode: afterNode };
+}
+
+function makeInlineEl(tag, inner, className) {
+  var el = className ? document.createElement(tag) : document.createElement(tag);
+  if (className) el.className = className;
+  el.textContent = inner;
+  return el;
+}
+
+function isWordBoundary(text, idx) {
+  if (idx <= 0) return true;
+  var ch = text[idx - 1];
+  return !/[A-Za-z0-9_]/.test(ch);
+}
+
+function tryInlineTransform() {
+  if (_transformLock) return;
+  var info = getCaretTextNode();
+  if (!info) return;
+  var node = info.node;
+  var text = node.textContent;
+  var offset = info.offset;
+
+  // Bold: **...** (triggered by typing the second * of **)
+  if (offset >= 4 && text.substring(offset - 2, offset) === '**') {
+    var before = text.substring(0, offset - 2);
+    var openIdx = before.lastIndexOf('**');
+    if (openIdx !== -1) {
+      var inner = before.substring(openIdx + 2);
+      if (inner.length > 0 && inner.indexOf('\n') === -1 && isWordBoundary(before, openIdx)) {
+        _transformLock = true;
+        try {
+          var el = makeInlineEl('strong', inner);
+          replaceTextRange(node, openIdx, offset, el);
+          setCaretAfter(el);
+          return;
+        } finally { _transformLock = false; }
+      }
+    }
+  }
+
+  // Italic: *...* (triggered by typing a single * not part of **)
+  if (offset >= 3 && text[offset - 1] === '*' && (offset < 2 || text[offset - 2] !== '*')) {
+    var before = text.substring(0, offset - 1);
+    var openIdx = before.lastIndexOf('*');
+    if (openIdx !== -1) {
+      var prevCh = openIdx > 0 ? before[openIdx - 1] : '';
+      if (openIdx === 0 || !/[A-Za-z0-9_]/.test(prevCh)) {
+        var inner = before.substring(openIdx + 1);
+        if (inner.length > 0 && inner.indexOf('\n') === -1 && inner.indexOf('*') === -1) {
+          _transformLock = true;
+          try {
+            var el = makeInlineEl('em', inner);
+            replaceTextRange(node, openIdx, offset, el);
+            setCaretAfter(el);
+            return;
+          } finally { _transformLock = false; }
+        }
+      }
+    }
+  }
+
+  // Code: `...`
+  if (offset >= 3 && text[offset - 1] === '`') {
+    var before = text.substring(0, offset - 1);
+    var openIdx = before.lastIndexOf('`');
+    if (openIdx !== -1) {
+      var inner = before.substring(openIdx + 1);
+      if (inner.length > 0 && inner.indexOf('\n') === -1 && inner.indexOf('`') === -1 && isWordBoundary(before, openIdx)) {
+        _transformLock = true;
+        try {
+          var el = makeInlineEl('code', inner);
+          replaceTextRange(node, openIdx, offset, el);
+          setCaretAfter(el);
+          return;
+        } finally { _transformLock = false; }
+      }
+    }
+  }
+
+  // Wikilink: [[...]]
+  if (offset >= 5 && text.substring(offset - 2, offset) === ']]') {
+    var before = text.substring(0, offset - 2);
+    var openIdx = before.lastIndexOf('[[');
+    if (openIdx !== -1) {
+      var inner = before.substring(openIdx + 2);
+      if (inner.length > 0 && inner.indexOf('\n') === -1 && inner.indexOf(']') === -1 && isWordBoundary(before, openIdx)) {
+        _transformLock = true;
+        try {
+          var el = makeInlineEl('span', inner, 'em-wikilink');
+          replaceTextRange(node, openIdx, offset, el);
+          setCaretAfter(el);
+          return;
+        } finally { _transformLock = false; }
+      }
+    }
+  }
+
+  // Inline prop: [K:V]
+  if (offset >= 4 && text[offset - 1] === ']' && (offset < 2 || text[offset - 2] !== ']')) {
+    var before = text.substring(0, offset - 1);
+    var openIdx = before.lastIndexOf('[');
+    if (openIdx !== -1 && (openIdx === 0 || before[openIdx - 1] !== '[')) {
+      var inner = before.substring(openIdx + 1);
+      if (inner.length > 0 && inner.indexOf('\n') === -1 && inner.indexOf(']') === -1 && isWordBoundary(before, openIdx)) {
+        var colonIdx = inner.indexOf(':');
+        if (colonIdx > 0) {
+          var key = inner.substring(0, colonIdx).trim();
+          if (key && /^[A-Za-z0-9_\- ]+$/.test(key)) {
+            _transformLock = true;
+            try {
+              var el = makeInlineEl('span', inner, 'em-inline-prop');
+              replaceTextRange(node, openIdx, offset, el);
+              setCaretAfter(el);
+              return;
+            } finally { _transformLock = false; }
+          }
+        }
+      }
+    }
+  }
+}
+
+var BLOCK_PREFIXES = [
+  { prefix: 'Title: ', tag: 'h1' },
+  { prefix: 'h2: ', tag: 'h2' },
+  { prefix: 'h3: ', tag: 'h3' },
+  { prefix: 'h4: ', tag: 'h4' },
+  { prefix: '@ai ', tag: 'div', className: 'em-ai', stripPrefix: true },
+  { prefix: '@memory ', tag: 'div', className: 'em-memory', stripPrefix: true },
+  { prefix: '@ ', tag: 'p', stripPrefix: true }
+];
+
+function tryBlockTransform() {
+  if (_transformLock) return;
+  var info = getCaretTextNode();
+  if (!info) return;
+  var node = info.node;
+  var text = node.textContent;
+  var offset = info.offset;
+
+  for (var i = 0; i < BLOCK_PREFIXES.length; i++) {
+    var p = BLOCK_PREFIXES[i];
+    if (text.substring(0, p.prefix.length) === p.prefix) {
+      var content = text.substring(p.prefix.length);
+      _transformLock = true;
+      try {
+        var el = document.createElement(p.tag);
+        if (p.className) el.className = p.className;
+        el.textContent = content;
+        var parent = node.parentNode;
+        parent.insertBefore(el, node);
+        parent.removeChild(node);
+        var r = document.createRange();
+        if (el.lastChild && el.lastChild.nodeType === Node.TEXT_NODE) {
+          r.setStart(el.lastChild, el.lastChild.textContent.length);
+        } else {
+          r.setStart(el, el.childNodes.length);
+        }
+        r.collapse(true);
+        var sel = window.getSelection();
+        sel.removeAllRanges();
+        sel.addRange(r);
+        return;
+      } finally { _transformLock = false; }
+    }
+  }
+}
+
+/* ===================== SERIALIZE (DOM -> .mrld) ===================== */
+
+function inlineToMrld(node) {
+  if (!node) return '';
+  if (node.nodeType === Node.TEXT_NODE) return node.textContent;
+  if (node.nodeType !== Node.ELEMENT_NODE) return '';
+  var tag = node.tagName.toLowerCase();
+  var inner = '';
+  for (var i = 0; i < node.childNodes.length; i++) {
+    inner += inlineToMrld(node.childNodes[i]);
+  }
+  if (tag === 'br') return '\n';
+  if (tag === 'input' || tag === 'hr') return '';
+  if (tag === 'strong' || tag === 'b') {
+    var t = inner.replace(/^\s+|\s+$/g, '');
+    return t ? '**' + t + '**' : '';
+  }
+  if (tag === 'em' || tag === 'i') {
+    var t = inner.replace(/^\s+|\s+$/g, '');
+    return t ? '*' + t + '*' : '';
+  }
+  if (tag === 'code') {
+    var t = inner.replace(/^\s+|\s+$/g, '');
+    return t ? '`' + t + '`' : '';
+  }
+  if (tag === 'span' && node.classList.contains('em-wikilink')) {
+    var t = node.textContent.replace(/^\s+|\s+$/g, '');
+    return t ? '[[' + t + ']]' : '';
+  }
+  if (tag === 'span' && node.classList.contains('em-inline-prop')) {
+    var t = node.textContent.replace(/^\s+|\s+$/g, '');
+    return t ? '[' + t + ']' : '';
+  }
+  return inner;
+}
+
+function pushTextLines(text, lines) {
+  String(text || '').replace(/\u00a0/g, ' ').split('\n').forEach(function(line) {
+    var clean = line.trim();
+    if (clean) lines.push(clean);
+  });
+}
+
+function serializePreviewNode(node, lines) {
+  if (node.nodeType === Node.TEXT_NODE) {
+    pushTextLines(node.textContent, lines);
+    return;
+  }
+  if (node.nodeType !== Node.ELEMENT_NODE) return;
+  var tag = node.tagName.toLowerCase();
+  if (tag === 'input' || tag === 'hr' || tag === 'br') return;
+
+  if (tag === 'h1') {
+    var t = inlineToMrld(node).replace(/^#\s*/, '').replace(/^\s+|\s+$/g, '');
+    if (t) lines.push('Title: ' + t);
+    return;
+  }
+  if (tag === 'h2') {
+    var t = inlineToMrld(node).replace(/^##\s*/, '').replace(/^\s+|\s+$/g, '');
+    if (t) lines.push('h2: ' + t);
+    return;
+  }
+  if (tag === 'h3') {
+    var t = inlineToMrld(node).replace(/^###\s*/, '').replace(/^\s+|\s+$/g, '');
+    if (t) lines.push('h3: ' + t);
+    return;
+  }
+  if (tag === 'h4') {
+    var t = inlineToMrld(node).replace(/^####\s*/, '').replace(/^\s+|\s+$/g, '');
+    if (t) lines.push('h4: ' + t);
+    return;
+  }
+  if (tag === 'p' || tag === 'div' || tag === 'span') {
+    var t = inlineToMrld(node);
+    var trimmed = t.replace(/^\s+|\s+$/g, '');
+    if (!trimmed) return;
+    if (node.classList.contains('em-ai')) lines.push('@ai ' + trimmed);
+    else if (node.classList.contains('em-memory')) lines.push('@memory ' + trimmed);
+    else if (node.classList.contains('em-wikilink')) lines.push('[[' + trimmed + ']]');
+    else if (node.classList.contains('em-inline-prop')) lines.push('[' + trimmed + ']');
+    else pushTextLines(t, lines);
+    return;
+  }
+  pushTextLines(inlineToMrld(node), lines);
+}
+
+function serializeLivePreview() {
+  var lines = [];
+  Array.prototype.forEach.call(livePreview.childNodes, function(node) {
+    serializePreviewNode(node, lines);
+  });
+  return lines.join('\n').replace(/\n{3,}/g, '\n\n').trim();
 }
 
 function autoSave() {
@@ -235,12 +553,19 @@ function exportNote() {
   URL.revokeObjectURL(a.href); saveStatus.textContent = 'Exported ' + filename + ' (self-opening)';
 }
 
+function stripTerminalDirectives(body) {
+  return String(body || '').replace(/^\/\/terminal(?:\s+\S+)?[ \t]*\n?/gm, '');
+}
+
 function importFileContent(filename, content) {
   var now = Date.now();
-  notes.push({ id: now.toString(), title: filename.replace(/\.mrld$/i,''), body: content, createdAt: now, updatedAt: now });
+  var safeBody = stripTerminalDirectives(content);
+  notes.push({ id: now.toString(), title: filename.replace(/\.mrld$/i,''), body: safeBody, createdAt: now, updatedAt: now });
   saveNotes(); currentView = 'editor'; activeId = notes[notes.length-1].id;
-  noteTitle.value = notes[notes.length-1].title; noteBody.value = content; updatePreview();
-  showEditorView(); renderNotesList(); updateDocsBtn(); saveStatus.textContent = 'Imported ' + filename;
+  noteTitle.value = notes[notes.length-1].title; noteBody.value = safeBody; updatePreview();
+  showEditorView(); renderNotesList(); updateDocsBtn();
+  if (safeBody !== content) saveStatus.textContent = 'Imported ' + filename + ' (terminal directive stripped)';
+  else saveStatus.textContent = 'Imported ' + filename;
 }
 function handleFileSelect(e) {
   var file = e.target.files[0]; if (!file) return;
@@ -252,11 +577,12 @@ function handleFileSelect(e) {
 function triggerImport() { importFile.click(); }
 function setupDragDrop() {
   var app = document.querySelector('.app'), dc = 0;
-  app.addEventListener('dragenter', function(e) { e.preventDefault(); e.stopPropagation(); dc++; if (dc===1) livePreview.classList.add('drag-over'); });
-  app.addEventListener('dragleave', function(e) { e.preventDefault(); e.stopPropagation(); dc--; if (dc===0) livePreview.classList.remove('drag-over'); });
+  function setDrag(on) { noteBody.classList.toggle('drag-over', on); editorContent.classList.toggle('drag-over', on); }
+  app.addEventListener('dragenter', function(e) { e.preventDefault(); e.stopPropagation(); dc++; if (dc===1) setDrag(true); });
+  app.addEventListener('dragleave', function(e) { e.preventDefault(); e.stopPropagation(); dc--; if (dc===0) setDrag(false); });
   app.addEventListener('dragover', function(e) { e.preventDefault(); e.stopPropagation(); });
   app.addEventListener('drop', function(e) {
-    e.preventDefault(); e.stopPropagation(); dc=0; livePreview.classList.remove('drag-over');
+    e.preventDefault(); e.stopPropagation(); dc=0; setDrag(false);
     var files = e.dataTransfer.files; if (!files.length) return;
     for (var i=0; i<files.length; i++) {
       var file = files[i]; if (!file.name.endsWith('.mrld')) continue;
@@ -364,85 +690,6 @@ function openTerminal(type) {
   resizeObserver.observe(termEl);
   terminalDisposables.push(function() { try { resizeObserver.disconnect(); } catch(e) {} });
 }
-function serializeLivePreview() {
-  var lines = [];
-  Array.prototype.forEach.call(livePreview.childNodes, function(node) {
-    serializePreviewNode(node, lines);
-  });
-  return lines.join('\n').replace(/\n{3,}/g, '\n\n').trim();
-}
-function pushTextLines(text, lines) {
-  String(text || '').replace(/\u00a0/g, ' ').split('\n').forEach(function(line) {
-    var clean = line.trim();
-    if (clean) lines.push(clean);
-  });
-}
-function serializePreviewNode(node, lines) {
-  if (node.nodeType === Node.TEXT_NODE) {
-    pushTextLines(node.textContent, lines);
-    return;
-  }
-  if (node.nodeType !== Node.ELEMENT_NODE) return;
-
-  var tag = node.tagName.toLowerCase();
-  var text = node.innerText.trim();
-  if (!text) return;
-
-  if (tag === 'h1') lines.push('Title: ' + text.replace(/^#\s*/, ''));
-  else if (tag === 'h2') lines.push('h2: ' + text.replace(/^##\s*/, ''));
-  else if (tag === 'h3') lines.push('h3: ' + text.replace(/^###\s*/, ''));
-  else if (tag === 'h4') lines.push('h4: ' + text.replace(/^####\s*/, ''));
-  else if (tag === 'li') {
-    if (node.classList.contains('em-task')) lines.push('> ' + text.replace(/^\s*/, ''));
-    else if (node.classList.contains('em-question')) lines.push('? ' + text.replace(/^\?\s*/, ''));
-    else if (node.classList.contains('em-important')) lines.push('! ' + text.replace(/^!\s*/, ''));
-    else lines.push('- ' + text.replace(/^-\s*/, ''));
-  }
-  else if (tag === 'ul') Array.prototype.forEach.call(node.children, function(child) { serializePreviewNode(child, lines); });
-  else if (node.classList.contains('em-kv')) lines.push('= ' + text.replace(/\s+/g, ' '));
-  else if (node.classList.contains('em-ai')) lines.push('@ai ' + text.replace(/^@ai\s*/, ''));
-  else if (node.classList.contains('em-memory')) lines.push('@memory ' + text.replace(/^MEM\s*/, ''));
-  else if (tag === 'table') lines.push(text);
-  else if (tag === 'pre') lines.push('Code:\n' + text.split('\n').map(function(line) { return '  ' + line; }).join('\n'));
-  else if (tag === 'div' && node.classList.contains('em-table-caption')) lines.push('Table: ' + text.replace(/^Table:\s*/, ''));
-  else if (tag === 'p' || tag === 'div') pushTextLines(text, lines);
-  else lines.push(text);
-}
-
-function getCaretOffset(container) {
-  var sel = window.getSelection();
-  if (!sel || !sel.rangeCount || !container.contains(sel.anchorNode)) return null;
-  var range = sel.getRangeAt(0).cloneRange();
-  var pre = range.cloneRange();
-  pre.selectNodeContents(container);
-  pre.setEnd(range.endContainer, range.endOffset);
-  return pre.toString().length;
-}
-
-function restoreCaretOffset(container, offset) {
-  if (offset === null || offset === undefined) return;
-  var walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT);
-  var remaining = offset;
-  var node = null;
-  while ((node = walker.nextNode())) {
-    if (remaining <= node.nodeValue.length) {
-      var range = document.createRange();
-      range.setStart(node, Math.max(0, remaining));
-      range.collapse(true);
-      var sel = window.getSelection();
-      sel.removeAllRanges();
-      sel.addRange(range);
-      return;
-    }
-    remaining -= node.nodeValue.length;
-  }
-}
-
-function renderPreservingCaret() {
-  var offset = getCaretOffset(livePreview);
-  updatePreview();
-  restoreCaretOffset(livePreview, offset);
-}
 
 function updateTerminalContext(type) {
   if (!termSessionId || !window.rubyNotesTerminal) return;
@@ -505,7 +752,6 @@ var recording = false;
 
 function setVoiceStatus(text) {
   if (voiceStatus) voiceStatus.textContent = text || '';
-  saveStatus.textContent = text || saveStatus.textContent;
 }
 function setAiWorking(active, text) {
   aiWorking.classList.toggle('hidden', !active);
@@ -688,30 +934,40 @@ function destroyTerminal() {
 /* ===================== INIT ===================== */
 
 var saveTimer = null;
+var directiveTimer = null;
 noteTitle.addEventListener('input', function() {
-  clearTimeout(saveTimer); saveStatus.textContent = 'Saving...';
-  saveTimer = setTimeout(function() { autoSave(); updatePreview(); }, 400);
-});
-noteBody.addEventListener('input', function() {
-  clearTimeout(saveTimer); saveStatus.textContent = 'Saving...';
-  saveTimer = setTimeout(function() { autoSave(); updatePreview(); }, 400);
-});
-livePreview.addEventListener('input', function(e) {
-  if (!activeId || currentView !== 'editor') return;
-  if (e.target && e.target.classList && e.target.classList.contains('em-checkbox')) return;
-  noteBody.value = serializeLivePreview();
-  clearTimeout(saveTimer); saveStatus.textContent = 'Saving...';
+  saveStatus.textContent = 'Saving...';
+  clearTimeout(saveTimer);
   saveTimer = setTimeout(function() {
     autoSave();
-    syncDirectivesFromSource(noteBody.value);
-    if (!analyzeDirectives(noteBody.value).cliType) renderPreservingCaret();
-  }, 450);
+    if (activeId && currentView === 'editor') updatePreview();
+  }, 300);
 });
+
+livePreview.addEventListener('input', function(e) {
+  if (!activeId || currentView !== 'editor') return;
+  tryInlineTransform();
+  tryBlockTransform();
+  noteBody.value = serializeLivePreview();
+  saveStatus.textContent = 'Saving...';
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(autoSave, 150);
+  clearTimeout(directiveTimer);
+  directiveTimer = setTimeout(function() {
+    syncDirectivesFromSource(noteBody.value);
+  }, 250);
+});
+
+livePreview.addEventListener('keydown', function(e) {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    setTimeout(tryBlockTransform, 0);
+  }
+});
+
 livePreview.addEventListener('blur', function() {
   if (!activeId || currentView !== 'editor') return;
   noteBody.value = serializeLivePreview();
   autoSave();
-  updatePreview();
 });
 
 newNoteBtn.addEventListener('click', createNote);

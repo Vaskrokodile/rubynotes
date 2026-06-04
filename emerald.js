@@ -1,4 +1,5 @@
 var _emeraldNotes = [];
+var _emeraldTransclusionStack = [];
 
 function setEmeraldNotes(notes) {
   _emeraldNotes = notes || [];
@@ -46,8 +47,14 @@ function parseEmerald(text) {
       fmHtml += renderFmRow(trimmed); continue;
     }
 
-    if (codeLines.length > 0) {
-      if (trimmed === '') { flushCode(); closeList(); closeDownTo(0); toggleDepth = -1; continue; }
+    if (codeLang || codeLines.length > 0) {
+      if (trimmed === '') {
+        if (codeLines.length > 0) flushCode();
+        codeLang = '';
+        closeList();
+        if (indentStack.length === 0) { closeDownTo(0); toggleDepth = -1; }
+        flushTable(); continue;
+      }
       codeLines.push(line); continue;
     }
 
@@ -68,7 +75,8 @@ function parseEmerald(text) {
     }
 
     if (trimmed === '') {
-      closeList(); closeDownTo(0); toggleDepth = -1;
+      closeList();
+      if (indentStack.length === 0) { closeDownTo(0); toggleDepth = -1; }
       flushTable(); continue;
     }
 
@@ -144,6 +152,7 @@ function parseEmerald(text) {
     if (type === 'comment') continue;
 
     if (indent < indentStack.length) {
+      closeList();
       closeDownTo(indent);
       if (toggleDepth >= indent) toggleDepth = indent - 1;
     }
@@ -288,12 +297,11 @@ function renderTable(caption, rows) {
   }
   for (var i = start; i < rows.length; i++) {
     html += '<tr>';
-    var cells = rows[i].split('|').filter(function(c) { return c.trim() || true; });
+    var cells = rows[i].split('|').map(function(c) { return c.trim(); }).filter(function(c) { return c; });
     cells.forEach(function(c) {
-      var ct = c.trim();
-      if (ct.startsWith('! ')) html += '<td class="em-td-warn">' + parseInline(ct.slice(2)) + '</td>';
-      else if (ct.startsWith('> ')) html += '<td class="em-td-good">' + parseInline(ct.slice(2)) + '</td>';
-      else html += '<td>' + parseInline(ct) + '</td>';
+      if (c.startsWith('! ')) html += '<td class="em-td-warn">' + parseInline(c.slice(2)) + '</td>';
+      else if (c.startsWith('> ')) html += '<td class="em-td-good">' + parseInline(c.slice(2)) + '</td>';
+      else html += '<td>' + parseInline(c) + '</td>';
     });
     html += '</tr>';
   }
@@ -368,7 +376,7 @@ function fmtDate(d) {
 function parseInline(text) {
   text = text.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
   text = text.replace(/__(.+?)__/g, '<strong>$1</strong>');
-  text = text.replace(/!([^!\s][^!]*[^!\s]|[^!\s])!/g, '<strong>$1</strong>');
+  text = text.replace(/!([^!\n][^!]*?[^!\n]|[^!\n])!/g, '<strong>$1</strong>');
 
   text = text.replace(/\*(.+?)\*/g, '<em>$1</em>');
   text = text.replace(/_(.+?)_/g, '<em>$1</em>');
@@ -381,14 +389,24 @@ function parseInline(text) {
   });
 
   text = text.replace(/\{\{note:([^}]+)\}\}/gi, function(match, title) {
-    var t = title.trim(), found = null;
+    var t = title.trim().toLowerCase();
+    if (!t) return match;
+    if (_emeraldTransclusionStack.indexOf(t) >= 0) {
+      return '<span class="em-transclude-miss">~' + esc(title.trim()) + '.mrld cycle~</span>';
+    }
+    var found = null;
     for (var i = 0; i < _emeraldNotes.length; i++) {
-      if (_emeraldNotes[i].title.toLowerCase() === t.toLowerCase()) { found = _emeraldNotes[i]; break; }
+      var n = _emeraldNotes[i];
+      if (n && typeof n.title === 'string' && n.title.toLowerCase() === t) { found = n; break; }
     }
     if (found) {
-      return '<div class="em-transclude"><div class="em-transclude-header">' + esc(found.title || 'untitled') + '.mrld</div><div class="em-transclude-body emerald-render">' + parseEmerald(found.body) + '</div></div>';
+      _emeraldTransclusionStack.push(t);
+      var inner;
+      try { inner = parseEmerald(found.body || ''); }
+      finally { _emeraldTransclusionStack.pop(); }
+      return '<div class="em-transclude"><div class="em-transclude-header">' + esc(found.title || 'untitled') + '.mrld</div><div class="em-transclude-body emerald-render">' + inner + '</div></div>';
     }
-    return '<span class="em-transclude-miss">~' + esc(t) + '.mrld not found~</span>';
+    return '<span class="em-transclude-miss">~' + esc(title.trim()) + '.mrld not found~</span>';
   });
 
   text = text.replace(/\[([^\]]+)\]/g, function(match, inner) {
